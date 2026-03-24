@@ -268,14 +268,14 @@ export default function Home({ club, athletes, stats, matchStats, onNavigate, mo
   // ── Estilos estáticos ────────────────────
   const css = {
     app: { minHeight:"100vh", background:PALETTE.bg, fontFamily:"'Arial Narrow', Arial, sans-serif", display:"flex", flexDirection:"column" },
-    topbar: { height:42, background:"rgba(0,0,0,0.96)", borderBottom:`1px solid ${PALETTE.neonBorder}`, display:"flex", alignItems:"stretch", flexShrink:0 },
+    topbar: { height:42, background:"rgba(0,0,0,0.96)", borderBottom:`1px solid ${PALETTE.neonBorder}`, display:"flex", alignItems:"stretch", flexShrink:0, overflowX:"auto" },
     brandBlock: { padding:"0 22px", display:"flex", alignItems:"center", background:"rgba(0,0,0,0.6)", borderRight:`1px solid ${PALETTE.border}` },
     navItem: (active) => ({ padding:"0 15px", fontSize:10, textTransform:"uppercase", letterSpacing:"1.8px", color: active ? PALETTE.text : PALETTE.textMuted, display:"flex", alignItems:"center", cursor:"pointer", borderRight:`1px solid ${PALETTE.border}`, borderBottom: active ? `2px solid ${PALETTE.neon}` : "2px solid transparent", background: active ? "rgba(200,255,0,0.05)" : "transparent", whiteSpace:"nowrap", transition:"color 0.15s" }),
     clubBadge: { marginLeft:"auto", display:"flex", alignItems:"center", gap:10, padding:"0 18px", borderLeft:`1px solid ${PALETTE.border}` },
     clubLogo: { width:28, height:28, borderRadius:"50%", background:"rgba(200,255,0,0.12)", border:`2px solid ${PALETTE.neon}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:9, fontWeight:700, color:PALETTE.neon, flexShrink:0 },
-    metrics: { display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:0, flexShrink:0, borderBottom:`1px solid ${PALETTE.border}` },
-    metricBlock: (i) => ({ padding:"10px 18px", display:"flex", alignItems:"center", gap:12, background: i===0 ? "rgba(200,255,0,0.07)" : "rgba(200,255,0,0.04)", borderBottom:`3px solid ${PALETTE.neon}`, borderRight: i<3 ? `1px solid ${PALETTE.border}` : "none" }),
-    grid: { flex:1, display:"grid", gridTemplateColumns:"1.6fr 1fr 1fr", gridTemplateRows:"1fr 90px", gap:3, padding:"3px 12px 10px", minHeight:0 },
+    metrics: { display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))", gap:0, flexShrink:0, borderBottom:`1px solid ${PALETTE.border}` },
+    metricBlock: (i) => ({ padding:"10px 18px", display:"flex", alignItems:"center", gap:12, background: i===0 ? "rgba(200,255,0,0.07)" : "rgba(200,255,0,0.04)", borderBottom:`3px solid ${PALETTE.neon}`, borderRight:`1px solid ${PALETTE.border}` }),
+    grid: { flex:1, display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))", gridAutoRows:"minmax(180px,1fr)", gap:3, padding:"3px 12px 10px", minHeight:0 },
     tag: { fontSize:9, textTransform:"uppercase", letterSpacing:"3px", fontWeight:600, color:PALETTE.neon, marginBottom:8, opacity:0.9 },
     titleBig: { fontSize:44, fontWeight:900, color:PALETTE.text, textTransform:"uppercase", letterSpacing:"-2px", lineHeight:0.9, textShadow:"0 2px 24px rgba(0,0,0,1)", marginBottom:18 },
     titleMid: { fontSize:24, fontWeight:900, color:PALETTE.text, textTransform:"uppercase", letterSpacing:"-0.8px", lineHeight:1, textShadow:"0 2px 14px rgba(0,0,0,0.9)", marginBottom:14 },

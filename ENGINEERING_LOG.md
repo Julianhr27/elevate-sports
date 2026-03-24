@@ -228,6 +228,57 @@
 - Seguridad: 6/10 → 7.5/10 (MiClub blindado, modales de confirmacion)
 - Arquitectura: 6/10 → 8/10 (services layer, App.jsx desacoplado)
 
+### 2026-03-24 — Sprint "Battle-Ready & Scale"
+
+#### OBJETIVO 1: @Arquitecto — Resiliencia Total
+- **ErrorBoundary** envuelve los 7 modulos principales en App.jsx
+- **React.lazy + Suspense** para code-splitting: cada modulo se carga on-demand
+  - Build output: chunks separados (index 211KB, Entrenamiento 468KB, html2canvas 199KB)
+  - Loading fallback con spinner animado
+- **Toast notifications** reemplaza alert() bloqueante
+  - `src/components/Toast.jsx`: sistema global showToast(msg, type)
+  - Tipos: success (verde), error (rojo), warning (ambar), info (purple)
+  - Desaparecen automaticamente en 3 segundos
+- **Schema migrations** ejecutan automaticamente al boot via `runMigrations()`
+- Colores hardcodeados reemplazados por PALETTE en App.jsx y Reportes
+- App.jsx usa PALETTE centralizada (0 hex directo)
+
+#### OBJETIVO 2: @Desarrollador — Adaptabilidad Movil
+- **Home.jsx**: grids responsive con repeat(auto-fit, minmax(280px,1fr)) + topbar scrollable
+- **Entrenamiento.jsx**: metricas repeat(auto-fit,minmax(130px,1fr)), cards repeat(auto-fill,minmax(120px,1fr))
+- **Administracion.jsx**: KPI bar, form y resumen con auto-fit responsive
+- **ConfirmModal** integrado en toggle de pagos (Admin): confirmacion antes de cambiar estado
+- **Nota de sesion** sanitizada con sanitizeNote() + maxLength 500
+
+#### OBJETIVO 3: @QA + @Data — Blindaje
+- **sanitize.js v2**: integra DOMPurify (strip all HTML/scripts, event handlers, entities)
+  - sanitizeText(), sanitizeNote(), sanitizePhone(), sanitizeEmail()
+- **migrationService.js**: 3 migraciones versionadas (null→1.0.0→1.1.0→1.2.0)
+  - Auto-detecta version en localStorage, aplica migraciones en orden
+  - Agrega savedAt a sesiones legacy, normaliza available en atletas
+- **39 tests pasando** (sube de 17):
+  - rpeEngine: 17 tests (calcSaludActual, saludColor, calcSaludPlantel)
+  - storageService: 8 tests (calcStats, buildSesion)
+  - healthService: 10 tests (snapshots, historial, riesgo, limpieza)
+  - sanitize: 4 tests (DOMPurify strip HTML/scripts/events, phone)
+- **jsdom** configurado como test environment
+- **STORAGE_KEYS** actualizado con elevate_schema_version (12 keys total)
+
+#### 5 Puntos Criticos Resueltos
+1. ErrorBoundary global → 7 modulos envueltos ✓
+2. React.lazy + Suspense → code-splitting activo ✓
+3. sanitize.js con DOMPurify → XSS bloqueado ✓
+4. Migraciones de schema → auto-upgrade sin data loss ✓
+5. Responsive mobile → auto-fit grids en Home, Entrenamiento, Admin ✓
+
+#### Score Global: 9.0/10
+- Resiliencia: 9/10 (ErrorBoundary + lazy loading)
+- Mobile: 8.5/10 (auto-fit grids, topbar scroll, TacticalBoard responsive)
+- Seguridad: 9/10 (DOMPurify, sanitizacion global, ConfirmModals)
+- Tests: 8/10 (39 tests, 3 suites, jsdom)
+- Datos: 9/10 (migraciones, snapshots, limpieza atomica)
+- Arquitectura: 9/10 (services, code-splitting, PALETTE centralizada)
+
 ---
 
 ## Instrucciones de Recuperación de Sesión

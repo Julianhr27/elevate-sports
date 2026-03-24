@@ -9,8 +9,10 @@
  */
 
 import { useState } from "react";
+import { AnimatePresence } from "framer-motion";
 import { PALETTE } from "../constants/palette";
 import { createMovimiento, validatePago } from "../constants/schemas";
+import ConfirmModal from "./ConfirmModal";
 
 const ADMIN = PALETTE.purple; // #7F77DD
 const ADMIN_DIM = "rgba(127,119,221,0.12)";
@@ -38,6 +40,7 @@ export default function Administracion({ athletes, finanzas, setFinanzas }) {
   const [movConcepto, setMovConcepto] = useState("");
   const [movMonto, setMovMonto] = useState("");
   const [formError, setFormError] = useState("");
+  const [confirmAction, setConfirmAction] = useState(null);
   const [movFecha, setMovFecha] = useState("2026-03-23");
 
   // ── Derived data ──
@@ -54,8 +57,8 @@ export default function Administracion({ athletes, finanzas, setFinanzas }) {
   const egresosMes = movimientos.filter(m => m.tipo === "egreso" && m.fecha.startsWith(selectedMes)).reduce((s, m) => s + m.monto, 0);
   const tasaMorosidad = athletes.length ? Math.round((pagosDelMes.filter(p => p.estado === "pendiente").length / athletes.length) * 100) : 0;
 
-  // ── Toggle payment status (validated) ──
-  const togglePago = (athleteId) => {
+  // ── Toggle payment status (with confirmation) ──
+  const doTogglePago = (athleteId) => {
     const cycle = { pendiente: "pagado", pagado: "parcial", parcial: "pendiente" };
     setFinanzas(prev => ({
       ...prev,
@@ -70,13 +73,25 @@ export default function Administracion({ athletes, finanzas, setFinanzas }) {
           const { valid, errors } = validatePago(updated);
           if (!valid) {
             console.warn("[Administracion.togglePago] Invalid state:", errors);
-            return p; // reject invalid transition
+            return p;
           }
           return updated;
         }
         return p;
       }),
     }));
+  };
+
+  const togglePago = (athleteId) => {
+    const pago = pagosDelMes.find(p => p.athleteId === athleteId);
+    const athlete = athletes.find(a => a.id === athleteId);
+    const cycle = { pendiente: "pagado", pagado: "parcial", parcial: "pendiente" };
+    const next = cycle[pago?.estado] || "pendiente";
+    setConfirmAction({
+      title: "Cambiar estado de pago",
+      message: `${athlete?.name || "Jugador"}: ${pago?.estado || "pendiente"} → ${next}`,
+      onConfirm: () => { doTogglePago(athleteId); setConfirmAction(null); },
+    });
   };
 
   // ── Add movement (validated via schema factory) ──
@@ -134,7 +149,7 @@ export default function Administracion({ athletes, finanzas, setFinanzas }) {
       cursor: "pointer",
       transition: "color 0.15s, background 0.15s",
     }),
-    kpiBar: { display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 0, marginBottom: 16 },
+    kpiBar: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 0, marginBottom: 16 },
     kpi: (color, i) => ({
       padding: "12px 18px",
       background: "rgba(0,0,0,0.65)",
@@ -303,7 +318,7 @@ export default function Administracion({ athletes, finanzas, setFinanzas }) {
           {/* FORM */}
           <div style={css.panel}>
             <div style={css.panelTitle}>REGISTRAR MOVIMIENTO</div>
-            <div style={{ display: "grid", gridTemplateColumns: "120px 1fr 140px 140px auto", gap: 10, alignItems: "end" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))", gap: 10, alignItems: "end" }}>
               <div>
                 <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "1px", color: PALETTE.textMuted, marginBottom: 5 }}>TIPO</div>
                 <select style={{ ...css.select, width: "100%" }} value={movTipo} onChange={e => setMovTipo(e.target.value)}>
@@ -378,7 +393,7 @@ export default function Administracion({ athletes, finanzas, setFinanzas }) {
       {/* TAB: RESUMEN                                */}
       {/* ═══════════════════════════════════════════ */}
       {activeTab === "Resumen" && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 12 }}>
           <div style={css.card(ADMIN)}>
             <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "2px", color: PALETTE.textMuted, marginBottom: 8 }}>BALANCE TOTAL</div>
             <div style={{ fontSize: 34, fontWeight: 700, color: balanceTotal >= 0 ? PALETTE.green : PALETTE.danger }}>{fmtCOP(balanceTotal)}</div>
@@ -398,6 +413,18 @@ export default function Administracion({ athletes, finanzas, setFinanzas }) {
         </div>
       )}
 
+      {/* Modal de confirmacion */}
+      <AnimatePresence>
+        {confirmAction && (
+          <ConfirmModal
+            title={confirmAction.title}
+            message={confirmAction.message}
+            onConfirm={confirmAction.onConfirm}
+            onCancel={() => setConfirmAction(null)}
+            accentColor={ADMIN}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

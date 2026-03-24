@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo } from "react";
 import Planificacion from "./Planificacion";
 import { getAvatarUrl as PHOTO } from "../utils/helpers";
 import { PALETTE } from "../constants/palette";
-const RPE_COLOR = (v) => v <= 3 ? "#1D9E75" : v <= 8 ? "#EF9F27" : "#E24B4A";
+import { sanitizeNote } from "../utils/sanitize";
+const RPE_COLOR = (v) => v <= 3 ? PALETTE.green : v <= 8 ? PALETTE.amber : PALETTE.danger;
 
 /* ── Helper: agrupa sesiones del historial por semana ISO ── */
 function groupByWeek(sessions) {
@@ -161,7 +162,7 @@ export default function Entrenamiento({ athletes, setAthletes, historial, onGuar
       })()}
 
       {/* MÉTRICAS */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(4,minmax(0,1fr))", gap:2 }}>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))", gap:2 }}>
         {[
           { label:"Presentes", value:stats.presentes, color:"#1D9E75", border:"#1D9E75" },
           { label:"Ausentes", value:stats.ausentes, color:"#E24B4A", border:"#E24B4A" },
@@ -203,7 +204,7 @@ export default function Entrenamiento({ athletes, setAthletes, historial, onGuar
           <div style={{ fontSize:9, textTransform:"uppercase", letterSpacing:"2px", color:"rgba(255,255,255,0.25)", marginBottom:12 }}>
             Toca P / A / L y registra el RPE de cada jugador
           </div>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(6,minmax(0,1fr))", gap:10, marginBottom:20 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(120px,1fr))", gap:10, marginBottom:20 }}>
             {athletes.map((a, i) => {
               const presente = a.status === "P";
               const ausente = a.status === "A";
@@ -258,7 +259,7 @@ export default function Entrenamiento({ athletes, setAthletes, historial, onGuar
             })}
           </div>
           <div style={{ background:"rgba(0,0,0,0.5)", borderLeft:"3px solid #1D9E75", padding:"10px 14px" }}>
-            <textarea value={nota} onChange={e=>setNota(e.target.value)} placeholder="Nota general de la sesión..." rows={2} style={{ ...inp, background:"transparent", border:"none", resize:"none", lineHeight:1.6 }}/>
+            <textarea value={nota} onChange={e=>setNota(sanitizeNote(e.target.value))} placeholder="Nota general de la sesion..." rows={2} style={{ ...inp, background:"transparent", border:"none", resize:"none", lineHeight:1.6 }} maxLength={500}/>
           </div>
         </div>
       )}
@@ -360,7 +361,7 @@ export default function Entrenamiento({ athletes, setAthletes, historial, onGuar
         return (
           <div style={{ padding:16 }}>
             {/* KPIs reales */}
-            <div style={{ display:"grid", gridTemplateColumns:"repeat(4,minmax(0,1fr))", gap:10, marginBottom:16 }}>
+            <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))", gap:10, marginBottom:16 }}>
               {[
                 { label:"Asistencia promedio", value: asistenciaGlobal + "%", color:"#1D9E75" },
                 { label:"RPE promedio", value: rpeGlobal, color:"white" },
