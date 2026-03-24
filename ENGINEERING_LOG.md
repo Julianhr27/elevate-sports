@@ -117,6 +117,117 @@
 - Cerrar tab → reabrir → Club/Demo carga si habia sesion activa
 - "Cerrar sesion" limpia todo y vuelve a Landing
 
+### 2026-03-23 — Sprint "Elite Performance & Onboarding"
+
+#### FASE 1: @Data (Mateo) — Motor RPE SaludActual
+- Creado `src/utils/rpeEngine.js` con formula: `SaludActual = 100 - (RPE_avg_7d * 10)`
+- `calcSaludActual(rpe, historial)` → { salud: 0-100, riskLevel, color, rpeAvg7d }
+- `calcSaludPlantel(athletes, historial)` → Map completo del plantel
+- `saludColor(salud)` → verde (>=60), ambar (>=30), rojo (<30)
+- Datos alimentados desde localStorage (historial + RPE actual del atleta)
+
+#### FASE 2: @Desarrollador (Andres) — TacticalBoard v7 con Framer Motion
+- `framer-motion` instalada como dependencia
+- Tokens de jugador se animan con `motion.div` + spring physics (stiffness:120, damping:18)
+- Al cambiar formacion (ej 4-3-3 → 3-5-2), jugadores se desplazan con trayectorias curvas organicas
+- `HealthBar` componente: barra de salud RPE animada con color semantico sobre cada ficha
+- Panel de detalle con animacion de entrada/salida (AnimatePresence)
+- Salud% y RPE 7d visibles en el panel lateral de cada jugador
+- Barras de salud tambien visibles en suplentes del sidebar
+
+#### FASE 2.5: @Desarrollador — Tabs ROLES y TACTICAS
+- 3 tabs en sidebar: FORMACION | ROLES | TACTICAS
+- Tab ROLES: textarea persistente (localStorage key: elevate_roles)
+- Tab TACTICAS: textarea persistente (localStorage key: elevate_tacticas)
+- Placeholders con estructura sugerida para el entrenador
+- Auto-guardado sin boton — escribe y persiste
+
+#### FASE 3: @QA (Sara) — Audit de integridad
+- STORAGE_KEYS actualizado con elevate_roles y elevate_tacticas (8 keys total)
+- Cambio Demo→Real limpia las 8 keys sin residuos
+- Cambio Real→Demo limpia las 8 keys sin residuos
+- Admin Pagos/Movimientos: ya existia funcional del sprint anterior
+- Build: 0 errores
+
+#### FASE 3: @Arquitecto — Integracion
+- Prop `historial` pasado App → GestionPlantilla → TacticalBoard para alimentar RPE engine
+- Schema docs/SCHEMA_MODEL.json sigue siendo el molde para ambos entornos
+- ENGINEERING_LOG.md actualizado
+
+### 2026-03-23 — Rediseño TacticalBoard v8 (Referencia FIFA Squad Management)
+
+#### Referencia visual
+- Imagen proporcionada por Julian: FIFA 18 Squad Management UI (Real Madrid)
+- Elementos clave: campo vertical, tokens grandes con OVR, subs en barra inferior, tabs FIFA, miniaturas de formacion, panel de roles con dropdowns
+
+#### @Desarrollador (Andres) — TacticalBoard v8 rewrite completo
+- **Campo VERTICAL** (reemplaza horizontal) con SVG de cancha completa
+- **Tokens grandes** (68px): foto + OVR prominente + nombre + barra salud + posicion badge
+- **5 tabs superiores estilo FIFA**: PLANTILLA | FORMACIONES | ROLES | INSTRUCCIONES | TACTICAS
+- **Suplentes en barra horizontal inferior** con foto circular, OVR grande, nombre, barra salud
+- **Miniaturas de formacion** como mini-canchas SVG con puntos de jugadores
+- **Panel de detalle FIFA card**: foto grande con gradiente, OVR 36px, radar hexagonal, stats, similares
+- **Framer Motion**: spring physics (stiffness:100, damping:16) para transiciones de formacion
+- **AnimatePresence** para panel de detalle y selector de formaciones
+
+#### @Desarrollador — Tabs funcionales
+- **ROLES**: tabla de asignacion POS: Jugador → Rol (dropdown por grupo posicional: GK, DEF, MID, FWD)
+- **INSTRUCCIONES**: textarea persistente para instrucciones de partido
+- **TACTICAS**: textarea persistente para plan tactico
+- Todos con auto-guardado en localStorage
+
+#### @Data (Mateo) — Persistencia
+- Nuevas keys: elevate_roles_v2, elevate_instructions (total: 10 keys)
+- STORAGE_KEYS actualizado para limpieza atomica
+
+#### @QA (Sara) — Build verificado: 0 errores
+
+### 2026-03-23 — Sprint Desacoplamiento + Mobile + Calidad
+
+#### MISION 1: @Arquitecto + @Data — Desacoplamiento
+- **[Arquitecto]** Creado `src/services/storageService.js`: abstraccion sobre localStorage
+  - API: loadDemoState(), loadProductionState(), logout(), calcStats(), buildSesion()
+  - App.jsx refactorizado de 310 → 150 lineas (solo routing + orquestacion)
+  - Logica de negocio extraida a servicios reutilizables
+  - Reportes extraido como componente separado con grid responsive (auto-fit)
+- **[Data]** Creado `src/services/healthService.js`: HealthSnapshots
+  - takeHealthSnapshot(): genera "foto" de salud de cada jugador presente al cerrar sesion
+  - getAthleteHealthHistory(): historial de salud por jugador
+  - getLatestPlantelHealth(): mapa de ultimo estado de salud
+  - getAtRiskAthletes(): atletas en riesgo (salud < 30)
+  - Max 500 snapshots para no saturar localStorage
+  - Integrado en App.jsx::guardarSesion() — auto-snapshot post-sesion
+  - clearSnapshots() en logout para limpieza completa
+
+#### MISION 2: @Desarrollador — Mobile + Modales
+- **[Desarrollador]** TacticalBoard responsive via CSS media queries inyectadas
+  - <768px: grid 1 columna, panel detalle como overlay fullscreen
+  - <480px: tokens reducidos (52px), campo min-height 350px
+  - Tabs con scroll horizontal en mobile
+  - Suplentes con flex-wrap en mobile
+- **[Desarrollador]** Creado `src/components/ConfirmModal.jsx`: modal reutilizable
+  - Animaciones spring con Framer Motion
+  - Backdrop click para cancelar
+  - Integrado en TacticalBoard: swap de jugadores y mover a suplentes requieren confirmacion
+
+#### MISION 3: @QA — Tests + Sanitizacion
+- **[QA]** Vitest instalado y configurado (excluye tools/agent-monitor)
+  - `npm test` → 17/17 tests passed
+  - Tests cubren: calcSaludActual (10 casos), saludColor (3 casos), calcSaludPlantel (3 casos + edge cases)
+  - Casos: RPE null, rango invalido, limitacion a 7 entradas, clamp 0-100, rpeAvg7d decimal
+- **[QA]** Creado `src/utils/sanitize.js`: sanitizacion centralizada (sanitizeText, sanitizePhone, sanitizeEmail)
+- **[QA]** MiClub.jsx blindado: todos los inputs sanitizados con sanitizeText(), maxLength en cada campo
+  - Nombre club: maxLength 80, strip <>{}
+  - Descripcion: maxLength 500
+  - Campos/canchas: maxLength 60
+  - Categorias custom: maxLength 30
+
+#### Score Global estimado: 7.5/10 (sube de 5.4)
+- Validacion: 7/10 → 8/10 (sanitizacion global)
+- Tests: 0/10 → 6/10 (17 tests RPE engine)
+- Seguridad: 6/10 → 7.5/10 (MiClub blindado, modales de confirmacion)
+- Arquitectura: 6/10 → 8/10 (services layer, App.jsx desacoplado)
+
 ---
 
 ## Instrucciones de Recuperación de Sesión

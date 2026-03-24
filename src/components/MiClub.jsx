@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { sanitizeText } from "../utils/sanitize";
 
 const CATEGORIAS_DEFAULT = [
   "Sub-7","Sub-8","Sub-9","Sub-10","Sub-11","Sub-12",
@@ -66,13 +67,13 @@ export default function MiClub({ clubInfo, setClubInfo }) {
             ].map(([l,k,p]) => (
               <div key={k}>
                 <label style={label}>{l}</label>
-                <input value={clubInfo[k]||""} onChange={e=>setClubInfo({...clubInfo,[k]:e.target.value})} placeholder={p} style={inp}/>
+                <input value={clubInfo[k]||""} onChange={e=>setClubInfo({...clubInfo,[k]:sanitizeText(e.target.value)})} placeholder={p} style={inp} maxLength={80}/>
               </div>
             ))}
           </div>
           <div style={{ marginTop:10 }}>
             <label style={label}>Descripción del club</label>
-            <textarea value={clubInfo.descripcion||""} onChange={e=>setClubInfo({...clubInfo,descripcion:e.target.value})} rows={3} placeholder="Misión, objetivos de la temporada..." style={{ ...inp, resize:"none", lineHeight:1.6 }}/>
+            <textarea value={clubInfo.descripcion||""} onChange={e=>setClubInfo({...clubInfo,descripcion:sanitizeText(e.target.value)})} rows={3} placeholder="Mision, objetivos de la temporada..." style={{ ...inp, resize:"none", lineHeight:1.6 }} maxLength={500}/>
           </div>
         </div>
 
@@ -88,7 +89,7 @@ export default function MiClub({ clubInfo, setClubInfo }) {
             ))}
           </div>
           <div style={{ display:"flex", gap:8 }}>
-            <input value={newCampo} onChange={e=>setNewCampo(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addCampo()} placeholder="Nombre del campo..." style={{ ...inp, flex:1 }}/>
+            <input value={newCampo} onChange={e=>setNewCampo(sanitizeText(e.target.value))} onKeyDown={e=>e.key==="Enter"&&addCampo()} placeholder="Nombre del campo..." style={{ ...inp, flex:1 }} maxLength={60}/>
             <div onClick={addCampo} style={{ background:"#1D9E75", color:"white", padding:"8px 16px", fontSize:11, cursor:"pointer", whiteSpace:"nowrap" }}>+ Agregar</div>
           </div>
         </div>
@@ -113,7 +114,7 @@ export default function MiClub({ clubInfo, setClubInfo }) {
           <div style={{ borderTop:"1px solid rgba(255,255,255,0.07)", paddingTop:12, marginTop:4 }}>
             <div style={{ fontSize:9, textTransform:"uppercase", letterSpacing:"1px", color:"rgba(255,255,255,0.25)", marginBottom:8 }}>Agregar categoría personalizada</div>
             <div style={{ display:"flex", gap:8 }}>
-              <input value={newCat} onChange={e=>setNewCat(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addCat()} placeholder="Ej: Femenino Sub-17..." style={{ ...inp, flex:1 }}/>
+              <input value={newCat} onChange={e=>setNewCat(sanitizeText(e.target.value))} onKeyDown={e=>e.key==="Enter"&&addCat()} placeholder="Ej: Femenino Sub-17..." style={{ ...inp, flex:1 }} maxLength={30}/>
               <div onClick={addCat} style={{ background:"#1D9E75", color:"white", padding:"8px 16px", fontSize:11, cursor:"pointer", whiteSpace:"nowrap" }}>+ Agregar</div>
             </div>
           </div>

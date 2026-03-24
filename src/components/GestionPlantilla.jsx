@@ -630,7 +630,7 @@ function TacticalBoardView({ athletes }) {
 // ─────────────────────────────────────────────
 // COMPONENTE RAÍZ
 // ─────────────────────────────────────────────
-export default function GestionPlantilla({ athletes, setAthletes }) {
+export default function GestionPlantilla({ athletes, setAthletes, historial = [] }) {
   const [activeTab, setActiveTab] = useState("lista");
 
   /**
@@ -689,7 +689,7 @@ export default function GestionPlantilla({ athletes, setAthletes }) {
           />
         )}
         {activeTab === "pizarra" && (
-          <TacticalBoard athletes={athletes} />
+          <TacticalBoard athletes={athletes} historial={historial} />
         )}
       </div>
     </div>

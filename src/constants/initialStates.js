@@ -131,4 +131,9 @@ export const STORAGE_KEYS = [
   "elevate_matchStats",
   "elevate_finanzas",
   "elevate_mode",
+  "elevate_roles",
+  "elevate_roles_v2",
+  "elevate_instructions",
+  "elevate_tacticas",
+  "elevate_healthSnapshots",
 ];
