@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import DOMPurify from "dompurify";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -63,42 +64,18 @@ export default function Planificacion({ athletes, clubInfo, sessionCount }) {
     setTareas(t);
   };
 
-  const handleImageUpload = async (i, file) => {
+  const handleImageUpload = (i, file) => {
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = async (e) => {
-      const base64 = e.target.result.split(",")[1];
+    reader.onload = (e) => {
       const t = [...tareas];
-      t[i] = { ...t[i], imagenPreview: e.target.result, analizando: true, svgRec: null };
+      t[i] = { ...t[i], imagenPreview: e.target.result, analizando: false, svgRec: null };
       setTareas([...t]);
 
-      try {
-        const res = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: "claude-sonnet-4-20250514",
-            max_tokens: 1000,
-            messages: [{
-              role: "user",
-              content: [
-                { type: "image", source: { type: "base64", media_type: file.type || "image/jpeg", data: base64 } },
-                { type: "text", text: `Analiza este diagrama táctico de fútbol dibujado en una pizarra o papel. Genera SOLO un SVG simple que lo recree digitalmente. El SVG debe tener viewBox="0 0 300 200", fondo verde oscuro #0a2010, líneas de campo blancas básicas, y representar las posiciones de los jugadores (círculos de colores) y las flechas de movimiento tal como se ven en la imagen. Responde ÚNICAMENTE con el código SVG, sin explicaciones ni markdown.` }
-              ]
-            }]
-          })
-        });
-        const data = await res.json();
-        const svgText = data.content?.[0]?.text || "";
-        const svgMatch = svgText.match(/<svg[\s\S]*<\/svg>/i);
-        const t2 = [...tareas];
-        t2[i] = { ...t2[i], analizando: false, svgRec: svgMatch ? svgMatch[0] : null };
-        setTareas([...t2]);
-      } catch(err) {
-        const t2 = [...tareas];
-        t2[i] = { ...t2[i], analizando: false };
-        setTareas([...t2]);
-      }
+      // TODO: El análisis IA de diagramas tácticos debe rutear por un backend propio
+      // (e.g. POST /api/analyze-diagram) para no exponer la API key de Anthropic en el frontend.
+      // La llamada directa a https://api.anthropic.com/v1/messages fue deshabilitada por seguridad.
+      alert("El análisis IA de diagramas requiere configuración del servidor. La imagen se guardó como preview.");
     };
     reader.readAsDataURL(file);
   };
@@ -375,7 +352,7 @@ export default function Planificacion({ athletes, clubInfo, sessionCount }) {
                     ) : t.svgRec ? (
                       <div>
                         <div style={{ fontSize:7, color:"#1D9E75", textTransform:"uppercase", letterSpacing:"1px", marginBottom:4, textAlign:"center" }}>Recreado por IA</div>
-                        <div dangerouslySetInnerHTML={{ __html: t.svgRec.replace(/width="[^"]*"/, 'width="94"').replace(/height="[^"]*"/, 'height="100"') }}/>
+                        <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(t.svgRec.replace(/width="[^"]*"/, 'width="94"').replace(/height="[^"]*"/, 'height="100"'), { USE_PROFILES: { svg: true } }) }}/>
                         <div onClick={()=>fileRefs.current[i]?.click()} style={{ fontSize:7, color:"rgba(255,255,255,0.3)", textAlign:"center", cursor:"pointer", marginTop:4 }}>cambiar imagen</div>
                       </div>
                     ) : t.imagenPreview ? (

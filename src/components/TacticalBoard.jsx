@@ -12,114 +12,9 @@
  */
 
 import { useState, useRef, useCallback } from "react";
-
-const C = {
-  neon:        "#c8ff00",
-  neonDim:     "rgba(200,255,0,0.1)",
-  neonBorder:  "rgba(200,255,0,0.3)",
-  amber:       "#EF9F27",
-  amberDim:    "rgba(239,159,39,0.12)",
-  amberBorder: "rgba(239,159,39,0.4)",
-  green:       "#1D9E75",
-  purple:      "#7F77DD",
-  danger:      "#E24B4A",
-  drag:        "#00e5ff",
-  dragDim:     "rgba(0,229,255,0.15)",
-  surface:     "rgba(5,10,5,0.92)",
-  border:      "rgba(255,255,255,0.08)",
-  borderHi:    "rgba(255,255,255,0.22)",
-  text:        "white",
-  textMuted:   "rgba(255,255,255,0.45)",
-  textHint:    "rgba(255,255,255,0.22)",
-};
-
-// ─────────────────────────────────────────────
-// FORMACIONES — coordenadas HORIZONTALES
-// left: 5% (portería propia) → 95% (portería rival)
-// top:  5% (arriba) → 95% (abajo)
-// ─────────────────────────────────────────────
-const FORMATIONS = {
-  "4-3-3": {
-    label: "Ataque",
-    positions: [
-      { posCode:"GK",  left:6,  top:50 },
-      { posCode:"LB",  left:22, top:15 },
-      { posCode:"CB",  left:24, top:38 },
-      { posCode:"CB",  left:24, top:62 },
-      { posCode:"RB",  left:22, top:85 },
-      { posCode:"CM",  left:45, top:25 },
-      { posCode:"CM",  left:47, top:50 },
-      { posCode:"CM",  left:45, top:75 },
-      { posCode:"LW",  left:72, top:12 },
-      { posCode:"ST",  left:78, top:50 },
-      { posCode:"RW",  left:72, top:88 },
-    ],
-  },
-  "4-4-2": {
-    label: "Holding",
-    positions: [
-      { posCode:"GK",  left:6,  top:50 },
-      { posCode:"LB",  left:22, top:15 },
-      { posCode:"LCB", left:24, top:38 },
-      { posCode:"RCB", left:24, top:62 },
-      { posCode:"RB",  left:22, top:85 },
-      { posCode:"LM",  left:45, top:15 },
-      { posCode:"LDM", left:47, top:38 },
-      { posCode:"RDM", left:47, top:62 },
-      { posCode:"RM",  left:45, top:85 },
-      { posCode:"LS",  left:76, top:33 },
-      { posCode:"RS",  left:76, top:67 },
-    ],
-  },
-  "3-5-2": {
-    label: "Compacto",
-    positions: [
-      { posCode:"GK",  left:6,  top:50 },
-      { posCode:"CB",  left:22, top:25 },
-      { posCode:"CB",  left:24, top:50 },
-      { posCode:"CB",  left:22, top:75 },
-      { posCode:"LWB", left:42, top:10 },
-      { posCode:"CM",  left:44, top:32 },
-      { posCode:"CM",  left:47, top:50 },
-      { posCode:"CM",  left:44, top:68 },
-      { posCode:"RWB", left:42, top:90 },
-      { posCode:"ST",  left:76, top:33 },
-      { posCode:"ST",  left:76, top:67 },
-    ],
-  },
-  "4-2-3-1": {
-    label: "Control",
-    positions: [
-      { posCode:"GK",  left:6,  top:50 },
-      { posCode:"LB",  left:22, top:15 },
-      { posCode:"CB",  left:24, top:38 },
-      { posCode:"CB",  left:24, top:62 },
-      { posCode:"RB",  left:22, top:85 },
-      { posCode:"DM",  left:40, top:38 },
-      { posCode:"DM",  left:40, top:62 },
-      { posCode:"LW",  left:58, top:18 },
-      { posCode:"CAM", left:62, top:50 },
-      { posCode:"RW",  left:58, top:82 },
-      { posCode:"ST",  left:80, top:50 },
-    ],
-  },
-  "5-3-2": {
-    label: "Defensivo",
-    positions: [
-      { posCode:"GK",  left:6,  top:50 },
-      { posCode:"LWB", left:20, top:8  },
-      { posCode:"CB",  left:23, top:28 },
-      { posCode:"CB",  left:25, top:50 },
-      { posCode:"CB",  left:23, top:72 },
-      { posCode:"RWB", left:20, top:92 },
-      { posCode:"CM",  left:46, top:28 },
-      { posCode:"CM",  left:48, top:50 },
-      { posCode:"CM",  left:46, top:72 },
-      { posCode:"ST",  left:76, top:33 },
-      { posCode:"ST",  left:76, top:67 },
-    ],
-  },
-};
+import { PALETTE as C } from "../constants/palette";
+import { FORMATIONS_HORIZONTAL as FORMATIONS } from "../constants/formations";
+import { getAvatarUrl as avatar, calculateAge, getStatusStyle } from "../utils/helpers";
 
 const POSITION_GROUPS = {
   GK:  ["GK"],
@@ -135,18 +30,10 @@ const getGroup = (posCode) => {
   return "MID";
 };
 
-const avatar = (seed, bg = "059669") =>
-  `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}&backgroundColor=${bg}`;
-
-const getStatusStyle = (status) => ({
-  P: { color: "#1D9E75", label: "Disponible" },
-  A: { color: "#E24B4A", label: "Ausente"    },
-  L: { color: "#EF9F27", label: "Lesionado"  },
-}[status] || { color: C.textMuted, label: "—" });
-
+/** Wrapper to preserve " años" suffix used in TacticalBoard */
 const calcAge = (dob) => {
-  if (!dob) return "—";
-  return Math.floor((Date.now() - new Date(dob)) / (1000*60*60*24*365.25)) + " años";
+  const age = calculateAge(dob);
+  return age === "—" ? "—" : age + " años";
 };
 
 // ─────────────────────────────────────────────
@@ -433,7 +320,6 @@ function PlayerToken({ starter, isSelected, isDragged, isTarget, onSelect, onDra
 // ─────────────────────────────────────────────
 export default function TacticalBoard({ athletes = [] }) {
   const [formationKey,      setFormationKey]      = useState("4-3-3");
-  const [showFormMenu,      setShowFormMenu]       = useState(false);
   const [dragging,          setDragging]           = useState(null);
   const [dropTarget,        setDropTarget]         = useState(null);
   const [selectedStarterIdx,setSelectedStarterIdx] = useState(null);
@@ -456,7 +342,6 @@ export default function TacticalBoard({ athletes = [] }) {
   // ── Cambio de formación ─────────────────────
   const handleFormationChange = useCallback((key) => {
     setFormationKey(key);
-    setShowFormMenu(false);
     setSelectedStarterIdx(null);
     const newPos = FORMATIONS[key].positions;
     setStarters(prev => newPos.map((pos, i) => ({
@@ -562,41 +447,7 @@ export default function TacticalBoard({ athletes = [] }) {
   const selectedStarter = selectedStarterIdx !== null ? starters[selectedStarterIdx] : null;
 
   return (
-    <div style={{ display:"flex", flexDirection:"column", height:"calc(100vh - 80px)", background:"#0a150a", fontFamily:"'Arial Narrow',Arial,sans-serif", overflow:"hidden" }}>
-
-      {/* ── SUBTABS (una sola fila, sin duplicados) */}
-      <div style={{ display:"flex", alignItems:"stretch", height:34, background:"rgba(0,0,0,0.85)", borderBottom:`1px solid ${C.border}`, flexShrink:0 }}>
-        {["plantilla","formaciones","instrucciones","tácticas"].map(tab => (
-          <div key={tab} style={{ padding:"0 16px", fontSize:10, textTransform:"uppercase", letterSpacing:"2px", color: tab==="plantilla" ? C.text : C.textMuted, display:"flex", alignItems:"center", cursor:"pointer", borderRight:`1px solid ${C.border}`, borderBottom: tab==="plantilla" ? `2px solid ${C.amber}` : "2px solid transparent", background: tab==="plantilla" ? C.amberDim : "transparent", whiteSpace:"nowrap" }}>
-            {tab}
-          </div>
-        ))}
-
-        {/* Badge formación — esquina derecha */}
-        <div style={{ marginLeft:"auto", position:"relative", display:"flex", alignItems:"center" }}>
-          <div
-            onClick={() => setShowFormMenu(v => !v)}
-            style={{ display:"flex", alignItems:"center", gap:10, padding:"0 16px", height:"100%", background:C.amberDim, borderLeft:`1px solid ${C.amberBorder}`, cursor:"pointer" }}
-          >
-            <div style={{ fontSize:17, fontWeight:900, color:C.amber, letterSpacing:"-1px" }}>{formationKey}</div>
-            <div>
-              <div style={{ fontSize:7, color:C.amber, textTransform:"uppercase", letterSpacing:"1.5px" }}>{FORMATIONS[formationKey].label}</div>
-              <div style={{ fontSize:7, color:C.textHint, textTransform:"uppercase", letterSpacing:"1px", marginTop:1 }}>▼ CAMBIAR</div>
-            </div>
-          </div>
-          {showFormMenu && (
-            <div style={{ position:"absolute", top:"100%", right:0, background:"rgba(5,10,5,0.98)", border:`1px solid ${C.border}`, zIndex:50, minWidth:160 }}>
-              {Object.entries(FORMATIONS).map(([key,f]) => (
-                <div key={key} onClick={() => handleFormationChange(key)}
-                  style={{ padding:"8px 14px", fontSize:11, color: formationKey===key ? C.amber : C.textMuted, cursor:"pointer", borderBottom:`1px solid rgba(255,255,255,0.04)`, background: formationKey===key ? C.amberDim : "transparent", fontWeight: formationKey===key ? 700 : 400, display:"flex", justifyContent:"space-between" }}>
-                  <span style={{ fontWeight:700, marginRight:10 }}>{key}</span>
-                  <span style={{ fontSize:9 }}>{f.label}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+    <div style={{ display:"flex", flexDirection:"column", height:"100%", background:"#0a150a", fontFamily:"'Arial Narrow',Arial,sans-serif", overflow:"hidden" }}>
 
       {/* ── LAYOUT: sidebar + campo + panel ─── */}
       <div style={{ flex:1, display:"grid", gridTemplateColumns:"160px 1fr auto", minHeight:0, overflow:"hidden" }}>
@@ -663,7 +514,7 @@ export default function TacticalBoard({ athletes = [] }) {
             ref={fieldRef}
             onDragOver={e => e.preventDefault()}
             onDrop={handleFieldDrop}
-            onClick={() => setShowFormMenu(false)}
+
             style={{
               flex:       1,
               position:   "relative",

@@ -28,6 +28,7 @@
  */
 
 import { useState } from "react";
+import useLocalStorage from "./hooks/useLocalStorage";
 import FieldBackground from "./components/FieldBackground";
 import Home from "./components/Home";
 import Entrenamiento from "./components/Entrenamiento";
@@ -70,23 +71,29 @@ const INITIAL_HISTORIAL = [
   { num:10, fecha:"Sáb 08 Mar", presentes:17, total:18, rpeAvg:7.8, tipo:"Físico",       nota:"Excelente disposición del grupo."                },
 ];
 
+// ─────────────────────────────────────────────
+// DATOS INICIALES DEL CLUB
+// En producción vendrán de Supabase.
+// ─────────────────────────────────────────────
+const INITIAL_CLUB_INFO = {
+  nombre:      "Águilas de Lucero",
+  disciplina:  "Fútbol",
+  ciudad:      "Medellín",
+  entrenador:  "Juan Felipe Cuervo",
+  temporada:   "2025-26",
+  categorias:  ["Sub-17"],
+  campos:      ["Campo principal", "Campo auxiliar"],
+  descripcion: "",
+  telefono:    "",
+  email:       "",
+};
+
 export default function App() {
   // ── Estado global ──────────────────────────
   const [activeModule, setActiveModule] = useState("home");
-  const [athletes,     setAthletes]     = useState(INITIAL_ATHLETES);
-  const [historial,    setHistorial]    = useState(INITIAL_HISTORIAL);
-  const [clubInfo,     setClubInfo]     = useState({
-    nombre:      "Águilas de Lucero",
-    disciplina:  "Fútbol",
-    ciudad:      "Medellín",
-    entrenador:  "Juan Felipe Cuervo",
-    temporada:   "2025-26",
-    categorias:  ["Sub-17"],
-    campos:      ["Campo principal", "Campo auxiliar"],
-    descripcion: "",
-    telefono:    "",
-    email:       "",
-  });
+  const [athletes,     setAthletes]     = useLocalStorage('elevate_athletes',  INITIAL_ATHLETES);
+  const [historial,    setHistorial]    = useLocalStorage('elevate_historial', INITIAL_HISTORIAL);
+  const [clubInfo,     setClubInfo]     = useLocalStorage('elevate_clubInfo',  INITIAL_CLUB_INFO);
 
   // ── Guardar sesión ─────────────────────────
   /**

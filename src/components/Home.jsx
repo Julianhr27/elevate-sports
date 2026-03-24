@@ -27,23 +27,7 @@ import imgPlantilla     from "../assets/Gestion_de_plantilla.jpeg";
 import imgPartido       from "../assets/Partido.jpeg";
 import imgOficina       from "../assets/Oficina.jpeg";
 import imgProximo       from "../assets/Proximo_partido.jpeg";
-
-// ─────────────────────────────────────────────
-// PALETA CENTRALIZADA
-// ─────────────────────────────────────────────
-const PALETTE = {
-  neon:        "#c8ff00",
-  neonGlow:    "rgba(200,255,0,0.55)",
-  neonDim:     "rgba(200,255,0,0.08)",
-  neonBorder:  "rgba(200,255,0,0.22)",
-  bg:          "#050a14",
-  surface:     "rgba(0,0,0,0.88)",
-  border:      "rgba(255,255,255,0.08)",
-  text:        "white",
-  textMuted:   "rgba(255,255,255,0.4)",
-  textHint:    "rgba(255,255,255,0.22)",
-  danger:      "#ff4444",
-};
+import { PALETTE }      from "../constants/palette";
 
 // ─────────────────────────────────────────────
 // NAVEGACIÓN
@@ -112,7 +96,7 @@ function useGameAudio() {
 
       osc.start(ctx.currentTime);
       osc.stop(ctx.currentTime + 0.15);
-    } catch (_) {
+    } catch {
       // AudioContext puede estar bloqueado hasta interacción del usuario — silencioso
     }
   }, [getCtx]);
@@ -152,7 +136,7 @@ function useGameAudio() {
       gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
       osc2.start(now);
       osc2.stop(now + 0.21);
-    } catch (_) {}
+    } catch { /* audio context not supported */ }
   }, [getCtx]);
 
   return { playHover, playSelect };
@@ -179,7 +163,7 @@ function useGameAudio() {
  * @param {ReactNode} children      - Contenido del tile
  */
 function InteractiveTile({
-  tileKey, gridColumn, gridRow,
+  gridColumn, gridRow,
   image, overlayType = "bottom",
   borderTopColor = PALETTE.neon, borderTopWidth = 4,
   onClick, playHover, playSelect,
@@ -275,7 +259,7 @@ function InteractiveTile({
 // ─────────────────────────────────────────────
 // HOME PRINCIPAL
 // ─────────────────────────────────────────────
-export default function Home({ club, athletes, historial, stats, onNavigate }) {
+export default function Home({ club, athletes, stats, onNavigate }) {
   const { playHover, playSelect } = useGameAudio();
 
   const clubInitials = (club.nombre || "ES")

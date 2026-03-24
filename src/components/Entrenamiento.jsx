@@ -1,7 +1,6 @@
 import { useState } from "react";
 import Planificacion from "./Planificacion";
-
-const PHOTO = (seed, bg="059669") => `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}&backgroundColor=${bg}`;
+import { getAvatarUrl as PHOTO } from "../utils/helpers";
 const RPE_COLOR = (v) => v <= 3 ? "#1D9E75" : v <= 8 ? "#EF9F27" : "#E24B4A";
 
 export default function Entrenamiento({ athletes, setAthletes, historial, onGuardar, stats, clubInfo }) {
