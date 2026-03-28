@@ -22,12 +22,31 @@
  */
 
 import { useState, useRef, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import imgEntrenamiento from "../assets/entrenamiento.jpeg";
 import imgPlantilla     from "../assets/Gestion_de_plantilla.jpeg";
 import imgPartido       from "../assets/Partido.jpeg";
 import imgOficina       from "../assets/Oficina.jpeg";
 import imgProximo       from "../assets/Proximo_partido.jpeg";
 import { PALETTE }      from "../constants/palette";
+
+// ─────────────────────────────────────────────
+// ANIMATION VARIANTS
+// ─────────────────────────────────────────────
+const fadeInUp = {
+  initial: { opacity: 0, y: 16 },
+  animate: { opacity: 1, y: 0 },
+  transition: { type: "spring", stiffness: 300, damping: 28 },
+};
+
+const staggerContainer = {
+  animate: { transition: { staggerChildren: 0.06 } },
+};
+
+const metricItemVariant = {
+  initial: { opacity: 0, y: 10 },
+  animate: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 350, damping: 28 } },
+};
 
 // ─────────────────────────────────────────────
 // NAVEGACIÓN
@@ -268,13 +287,13 @@ export default function Home({ club, athletes, stats, matchStats, onNavigate, mo
   // ── Estilos estáticos ────────────────────
   const css = {
     app: { minHeight:"100vh", background:PALETTE.bg, fontFamily:"'Arial Narrow', Arial, sans-serif", display:"flex", flexDirection:"column" },
-    topbar: { height:42, background:"rgba(0,0,0,0.96)", borderBottom:`1px solid ${PALETTE.neonBorder}`, display:"flex", alignItems:"stretch", flexShrink:0, overflowX:"auto" },
+    topbar: { height:42, background:"rgba(10,10,15,0.85)", backdropFilter:"blur(20px)", WebkitBackdropFilter:"blur(20px)", borderBottom:`1px solid ${PALETTE.neonBorder}`, display:"flex", alignItems:"stretch", flexShrink:0, overflowX:"auto" },
     brandBlock: { padding:"0 22px", display:"flex", alignItems:"center", background:"rgba(0,0,0,0.6)", borderRight:`1px solid ${PALETTE.border}` },
     navItem: (active) => ({ padding:"0 15px", fontSize:10, textTransform:"uppercase", letterSpacing:"1.8px", color: active ? PALETTE.text : PALETTE.textMuted, display:"flex", alignItems:"center", cursor:"pointer", borderRight:`1px solid ${PALETTE.border}`, borderBottom: active ? `2px solid ${PALETTE.neon}` : "2px solid transparent", background: active ? "rgba(200,255,0,0.05)" : "transparent", whiteSpace:"nowrap", transition:"color 0.15s" }),
     clubBadge: { marginLeft:"auto", display:"flex", alignItems:"center", gap:10, padding:"0 18px", borderLeft:`1px solid ${PALETTE.border}` },
     clubLogo: { width:28, height:28, borderRadius:"50%", background:"rgba(200,255,0,0.12)", border:`2px solid ${PALETTE.neon}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:9, fontWeight:700, color:PALETTE.neon, flexShrink:0 },
     metrics: { display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))", gap:0, flexShrink:0, borderBottom:`1px solid ${PALETTE.border}` },
-    metricBlock: (i) => ({ padding:"10px 18px", display:"flex", alignItems:"center", gap:12, background: i===0 ? "rgba(200,255,0,0.07)" : "rgba(200,255,0,0.04)", borderBottom:`3px solid ${PALETTE.neon}`, borderRight:`1px solid ${PALETTE.border}` }),
+    metricBlock: (i) => ({ padding:"10px 18px", display:"flex", alignItems:"center", gap:12, background: i===0 ? "rgba(200,255,0,0.07)" : "rgba(255,255,255,0.03)", backdropFilter:"blur(16px)", WebkitBackdropFilter:"blur(16px)", borderBottom:`3px solid ${PALETTE.neon}`, borderRight:`1px solid ${PALETTE.border}` }),
     grid: { flex:1, display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))", gridAutoRows:"minmax(180px,1fr)", gap:3, padding:"3px 12px 10px", minHeight:0 },
     tag: { fontSize:9, textTransform:"uppercase", letterSpacing:"3px", fontWeight:600, color:PALETTE.neon, marginBottom:8, opacity:0.9 },
     titleBig: { fontSize:44, fontWeight:900, color:PALETTE.text, textTransform:"uppercase", letterSpacing:"-2px", lineHeight:0.9, textShadow:"0 2px 24px rgba(0,0,0,1)", marginBottom:18 },
@@ -295,8 +314,8 @@ export default function Home({ club, athletes, stats, matchStats, onNavigate, mo
   ];
 
   const STATS = [
-    { val:matchStats.won,         lbl:"Ganados",   color:"#1D9E75" },
-    { val:matchStats.lost,        lbl:"Perdidos",  color:"#E24B4A" },
+    { val:matchStats.won,         lbl:"Ganados",   color:PALETTE.green },
+    { val:matchStats.lost,        lbl:"Perdidos",  color:PALETTE.danger },
     { val:matchStats.points,      lbl:"Puntos",    color:PALETTE.neon },
     { val:`${matchStats.goalsFor}-${matchStats.goalsAgainst}`, lbl:"Goles F/C", color:"white" },
   ];
@@ -343,20 +362,28 @@ export default function Home({ club, athletes, stats, matchStats, onNavigate, mo
       </div>
 
       {/* METRICS */}
-      <div style={css.metrics}>
+      <motion.div
+        variants={staggerContainer}
+        initial="initial"
+        animate="animate"
+        style={css.metrics}
+      >
         {METRICS.map((m, i) => (
-          <div key={m.label} style={css.metricBlock(i)}>
+          <motion.div key={m.label} variants={metricItemVariant} style={css.metricBlock(i)}>
             {m.icon}
             <div>
               <div style={{ fontSize:22, fontWeight:700, color:PALETTE.neon, lineHeight:1 }}>{m.value}</div>
               <div style={{ fontSize:9, textTransform:"uppercase", letterSpacing:"1px", color:PALETTE.textMuted, marginTop:2 }}>{m.label}</div>
             </div>
-          </div>
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
 
       {/* GRID DE MOSAICOS */}
-      <div style={css.grid}>
+      <motion.div
+        {...fadeInUp}
+        style={css.grid}
+      >
 
         {/* TILE 1 — ENTRENAMIENTO */}
         <InteractiveTile
@@ -456,7 +483,7 @@ export default function Home({ club, athletes, stats, matchStats, onNavigate, mo
           )}
         </InteractiveTile>
 
-      </div>
+      </motion.div>
 
       {/* FOOTER */}
       <div style={css.footer}>

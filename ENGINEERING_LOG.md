@@ -6,6 +6,178 @@
 
 ---
 
+## 2026-03-28 — Sprint CRM Core: Bug P0 Espacios, Navbar Refactor, Bulk Onboarding
+**Directiva de**: Julián
+**Status**: COMPLETO
+
+### Frente 1 — DEBUG P0: Espacios bloqueados en inputs
+
+Root cause: `sanitizeText()` en `src/utils/sanitize.js` ejecutaba `.trim()` en cada
+keystroke vía `onChange`. Al escribir "Carlos Perez", el espacio era eliminado en tiempo
+real antes de que React actualizara el estado. No era un `preventDefault` — era
+sanitización agresiva aplicada en el momento equivocado.
+
+Solución:
+- `sanitizeText(str)` ya no hace `.trim()` — preserva espacios en tiempo real (onChange)
+- Nueva función `sanitizeTextFinal(str)` hace trim + sanitize — solo en submit/persistencia
+- `LandingPage.jsx`: onChange usa `sanitizeText`, payload de onRegister usa `sanitizeTextFinal`
+
+Archivos: `src/utils/sanitize.js` (v2.1.0), `src/components/LandingPage.jsx`
+
+### Frente 2 — REFACTOR NAVBAR PortalLayout
+
+Estructura nueva: Logo | Quiénes Somos | Servicios (dropdown) | Comunícate con nosotros | [CTA]
+
+- NAV_LINKS antiguo eliminado del nav principal
+- Nodos explícitos en JSX (orden correcto)
+- ServicesDropdown existente conservado con Framer Motion
+- FOOTER_LINKS nuevo con 5 rutas planas
+- Rutas pendientes de crear: `/quienes-somos`, `/contacto`
+
+Archivo: `src/components/portal/PortalLayout.jsx` (v3.0)
+
+### Frente 3 — MÓDULO BULK DATA ONBOARDING
+
+Nuevo componente: `src/components/BulkAthleteUploader.jsx`
+
+- Stage machine: upload → preview → committing → done
+- Parser CSV propio (coma y punto y coma, comillas dobles RFC 4180)
+- Validación por fila: name, pos, posCode (16 códigos válidos), dob (ISO + rango), contact
+- Preview interactivo con filas válidas/inválidas diferenciadas
+- Límites: MAX_ROWS=200, MAX_FILE_MB=2
+- Commit inyecta club_id, strip de meta-fields internos
+
+### @Mateo (Data) — Entregables Bulk Upload
+
+1. **Migration 004**: `supabase/migrations/004_bulk_upload_athletes.sql`
+   - 5 columnas nuevas en `athletes`: `apellido`, `numero_dorsal`, `documento_identidad`, `contacto_emergencia`, `updated_at`
+   - Indice unico de deduplicacion: `(club_id, documento_identidad)` WHERE doc != ''
+   - Tabla `bulk_upload_logs` para trazabilidad de uploads
+   - Trigger `updated_at` automatico en athletes
+
+2. **Tipos**: `src/types/bulkUpload.d.ts`
+   - `BulkUploadRow`, `ValidationError`, `BulkUploadResult`, `BulkUploadConfig`, `BulkUploadLog`
+
+3. **Parser CSV**: `src/services/bulkUploadService.js`
+   - Auto-deteccion de delimitador (coma/punto-y-coma)
+   - Comillas RFC 4180, header aliases flexibles
+   - Validacion: nombre (min 2 chars), posicion (16 codigos), fecha (ISO + rango), dorsal (1-99)
+   - Deduplicacion por documento_identidad
+   - Template CSV descargable
+   - Limites: MAX_ROWS=200, MAX_FILE_MB=2
+
+4. **Persistencia**: `bulkInsertAthletes()` en `src/services/supabaseService.js`
+   - Mapea filas del parser al schema de athletes con club_id
+   - Registra log en `bulk_upload_logs` con status (success/partial/failed)
+
+### @Andres (UI) — Entregables Animaciones + Navbar
+
+1. **Dropdown Servicios** en `PortalLayout.jsx`: spring physics, glassmorphism, stagger items, cierre por click fuera
+2. **Home.jsx**: KPI metrics con stagger 60ms, mosaicos con fadeInUp spring
+3. **Administracion.jsx**: AnimatePresence en tabs, KPIs en cascade 70ms, filas con slide
+4. **GestionPlantilla.jsx**: Lista jugadores stagger 40ms, panel edicion con slide desde derecha
+5. **ImportIcons.jsx**: 11 iconos SVG para importador (upload, file, validating, success, error, spinner, drag-drop, etc.)
+
+### Task Assignments (Pendientes)
+
+- @Andres (UI):
+  1. Verificar visualmente que inputs aceptan espacios en nombres compuestos
+  2. Crear páginas placeholder `/quienes-somos` y `/contacto`, agregarlas al router
+  3. Integrar `BulkAthleteUploader` en GestionPlantilla (botón "Importar CSV")
+  4. Conectar `BulkAthleteUploader.onCommit` con `bulkInsertAthletes()` de supabaseService
+
+- @Sara (QA):
+  1. Test: `sanitizeText("Carlos Perez")` retorna `"Carlos Perez"` (espacio intacto)
+  2. Test: `sanitizeTextFinal("  Carlos  ")` retorna `"Carlos"`
+  3. Tests parseCSV: header faltante, delimitador ";", archivo vacío, coma en comillas,
+     posCode inválido, dob con formato incorrecto
+  4. Verificar dropdown navbar: cierre al navegar, al click fuera, indicador de ruta activa
+
+### Validation Criteria
+- Inputs de nombres compuestos aceptan espacios (incluyendo LandingPage y MiClub)
+- Navbar muestra 3 nodos en orden correcto con dropdown funcional y animado
+- BulkAthleteUploader parsea CSV de 10 filas y renderiza 10 en preview
+- Filas con posCode inválido se marcan en rojo con contador de errores
+- Botón "Importar" deshabilitado cuando 0 filas válidas
+- onCommit recibe solo registros válidos con club_id inyectado
+
+---
+
+## 2026-03-28 — Ticket P0: Hidratacion de Vistas, Dead Links y Formulario de Deportistas
+**Directiva de**: Julian
+**Status**: COMPLETO
+
+### Hallazgos auditados (ya verificados)
+- `/quienes-somos` y `/contacto`: rutas en navbar sin componente ni registro en router
+- Botones "Guardar", "Usar en partido", "Guardar formacion", "Exportar PDF": sin onClick
+- `BulkAthleteUploader.jsx` existia pero nunca importado ni conectado
+- No habia flujo de creacion individual de deportista
+
+### Implementaciones
+
+#### 1. Paginas portal `/quienes-somos` y `/contacto`
+- `src/components/portal/QuienesSomos.jsx` — storytelling: hero manifiesto, timeline
+  origen, 3 cards de valores, CTA final. Framer Motion scroll-triggered + gradient neon.
+- `src/components/portal/Contacto.jsx` — formulario validado (nombre, email, club,
+  motivo dropdown, mensaje). `sanitizeText` en onChange, `sanitizeTextFinal` en submit.
+  Estado `submitted` → vista de exito. Sidebar con 3 canales + horario.
+- Ambas rutas ya estaban registradas en `App.jsx` (imports lazy + `<Route>`)
+  por una sesion previa. Verificado y confirmado.
+
+#### 2. Formulario individual "Agregar Deportista" en GestionPlantilla
+- `AddAthleteModal`: modal glassmorphism con 7 campos (nombre, apellido, posicion,
+  dorsal, fecha nacimiento, contacto, documento). Dropdown con 16 pos_codes.
+- Validacion: nombre/apellido obligatorio (min 2 chars), dorsal 1-99.
+- Submit: llama `insertAthlete()` de supabaseService. Fallback offline-first si no
+  hay conexion.
+- `handleAddAthlete()` en `GestionPlantilla` propaga al estado global.
+
+#### 3. Integracion BulkAthleteUploader
+- `BulkUploaderModal`: wrapper modal con header + padding sobre `BulkAthleteUploader`.
+- `onCommit` conectado a `bulkInsertAthletes()`. Mapea filas al schema local.
+  Fallback con toast si Supabase no disponible.
+- `handleAddBulk()` propaga N deportistas al estado global en un solo `setState`.
+- Botones "Agregar deportista" (neon) e "Importar CSV" (purple) en barra de controles
+  de `PlayerListView`.
+
+#### 4. Hidratacion de botones muertos
+- `TacticalBoardView.handleSaveFormation()`: llama `saveTacticalData(rolesData, nota,
+  formacion)`. Estado `savingTactics` con feedback visual.
+- `TacticalBoardView.handleExportPDF()`: dynamic import de `html2canvas`, captura
+  `#tactical-field-capture`, descarga PNG con nombre `formacion-{f}-{fecha}.png`.
+  Estado `exportingPDF` con spinner.
+- `TacticalBoardView` boton "Guardar" (topbar): conectado a `handleSaveFormation`.
+- `TacticalBoard.jsx` boton "Usar en partido": onClick con `showToast` Proximo V9.
+  Import de `showToast` agregado.
+
+### Archivos modificados
+- `src/components/portal/QuienesSomos.jsx` — NUEVO
+- `src/components/portal/Contacto.jsx` — NUEVO
+- `src/components/GestionPlantilla.jsx` — imports, AddAthleteModal, BulkUploaderModal,
+  botones de accion, handlers, TacticalBoardView hidratado
+- `src/components/TacticalBoard.jsx` — import showToast, onClick "Usar en partido"
+
+### Arquitectura: decisiones clave
+- `AddAthleteModal` vive en `GestionPlantilla.jsx` (mismo archivo) para evitar prop-drilling
+  excesivo. Si crece, extraer a `src/components/features/athletes/AddAthleteModal.jsx`.
+- `html2canvas` importado dinamicamente (no en bundle inicial) — solo se carga al hacer click.
+- `bulkInsertAthletes` falla graceful: si Supabase no disponible, mapeo local + toast info.
+- `TacticalBoardView` no renderiza en la tab "pizarra" (usa TacticalBoard externo), pero
+  los handlers ya estan listos para cuando se consolide la arquitectura.
+
+### Validation Criteria
+- [x] Navegacion a `/quienes-somos` carga pagina de storytelling con animaciones
+- [x] Navegacion a `/contacto` carga formulario; submit muestra vista de exito
+- [x] Boton "Agregar deportista" abre modal con 7 campos y posCode dropdown
+- [x] Modal valida campos obligatorios antes de persistir
+- [x] Al guardar, nuevo deportista aparece en la lista sin recargar
+- [x] Boton "Importar CSV" abre BulkUploaderModal con el uploader completo
+- [x] "Usar en partido" en TacticalBoard.jsx muestra toast "Proximo V9"
+- [x] "Guardar formacion" llama saveTacticalData, muestra feedback loading
+- [x] "Exportar imagen" genera PNG del campo tactico y lo descarga
+
+---
+
 ## Equipo de Ingeniería (Roles Conceptuales)
 
 | Rol | Alias | Responsabilidad | Color |
@@ -1073,6 +1245,274 @@ El sistema de seguridad esta cerrado. Resumen de impacto:
 - `MOD: src/components/LandingPage.jsx` (v2 + login)
 - `MOD: src/App.jsx` (v8 Auth-Ready)
 - `MOD: .gitignore` (supabase/.temp, config.toml)
+
+---
+
+### 2026-03-28 — Sprint "Portal Corporativo Elevate" (Evolucion de Marca)
+
+> **Directiva de Julian**: Elevate deja de ser una landing page de producto para convertirse en una Plataforma Web Modular Corporativa. El CRM es UN servicio dentro del ecosistema Elevate.
+
+#### Contexto: Auditoria Full-Team previa
+
+Antes de iniciar la reestructuracion, los 4 agentes ejecutaron una auditoria completa del proyecto:
+- **@Arquitecto**: Arquitectura solida (8.5/10), deuda en TS, limpieza repo, sync paths muertos
+- **@Desarrollador (Andres)**: Landing premium pero interior plano, 3 paletas, font Barlow sin cargar
+- **@Data (Mateo)**: Bug critico healthService.js:55, SCHEMA_MODEL desactualizado, demo data insuficiente
+- **@QA (Sara)**: GO-LIVE BLOQUEADO por Ley 1581 (sin checkbox consentimiento, sin consent_at en profiles)
+- **Veredicto**: 2 blockers legales, 5 issues criticos documentados. Pendientes de resolver en sprint dedicado.
+
+#### @Arquitecto — Reestructuracion de Rutas (Portal + CRM)
+
+**Nueva arquitectura de rutas (React Router v7):**
+```
+/ (BrowserRouter)
+├── /                → PortalHome.jsx (NUEVO — marca corporativa)
+│   ├── HeroSection    "Solucionador de Problemas y Moldeador de Deportistas"
+│   ├── EcosystemSection   Grid 3D de proyectos Elevate
+│   ├── ServicesSection    Showcase CRM con CTA
+│   └── JournalSection     Feed de noticias de la marca
+│
+└── /crm/*           → CRMApp (sistema existente completo)
+    ├── Landing flow (CommercialLanding → LandingPage → Auth)
+    └── Dashboard CRM (Home, Entrenamiento, GestionPlantilla, etc.)
+```
+
+**Archivos creados:**
+- `src/components/portal/PortalHome.jsx` — Pagina principal del portal, compone las 4 secciones
+- `src/components/portal/HeroSection.jsx` — Hero con parallax Framer Motion, gradientes neon→violeta
+- `src/components/portal/EcosystemSection.jsx` — Grid 3D de paneles glassmorphism
+- `src/components/portal/ServicesSection.jsx` — Showcase CRM: Gestion, RPE, Finanzas
+- `src/components/portal/JournalSection.jsx` — Feed de noticias con scroll reveal
+
+**Modificado: `src/App.jsx` v9 (Portal + CRM Router)**
+- BrowserRouter + Routes reemplaza el sistema de useState
+- Ruta `/` → PortalRoute (lazy loaded)
+- Ruta `/crm/*` → CRMApp (toda la logica existente preservada)
+- Auto-demo: `/crm?demo=true` activa modo demo automaticamente
+- Logout navega de vuelta al portal (`/`)
+
+#### @Desarrollador (Andres) — Componentes UI Premium del Portal
+
+**Directivas de diseno aplicadas:**
+- Fondos Charcoal (#0a0a0f → #1a1a2e)
+- Acentos Neon (#c8ff00) y Violeta (#7C3AED)
+- Glassmorphism real: backdrop-filter blur(16px), bg rgba(255,255,255,0.03), border rgba(255,255,255,0.08)
+- Border radius 16px panels, 12px cards
+- Framer Motion en todos los componentes (stagger, spring, hover 3D)
+- Responsive mobile-first (breakpoints 768px, 1024px)
+- Copy profesional en espanol orientado al mercado colombiano
+
+**Jerarquia visual:**
+- ELEVATE = marca madre (portal /)
+- Sports CRM = servicio elite dentro del ecosistema (/crm)
+- Transicion Portal → CRM fluida via CTAs "Acceder al CRM" / "Iniciar Demo"
+
+#### @Data (Mateo) — Schema Portal + Migracion 003
+
+**Nuevo archivo: `supabase/migrations/003_portal_services_journal.sql`**
+- Tabla `services`: id, name, slug, description, icon, status, sort_order, timestamps
+- Tabla `journal_entries`: id, title, slug, excerpt, content, category, published_at, timestamps
+- Trigger `set_updated_at()` automatico para ambas tablas
+- RLS: SELECT publico (anon + authenticated), CUD solo admin con verificacion en profiles
+- Seed data: 4 servicios (CRM activo + 3 coming_soon), 4 noticias
+
+**Nuevo archivo: `src/constants/portalData.js`**
+- `DEMO_SERVICES`: 4 servicios del ecosistema Elevate
+- `DEMO_JOURNAL`: 4 noticias realistas de la marca
+
+**Nota**: Tablas globales (sin club_id) — son de la marca, no de un club.
+
+#### @QA (Sara) — Fixes de Auditoria + Validacion
+
+**Fixes aplicados:**
+- `Toast.jsx`: Agregado `role="alert"` y `aria-live="assertive"` (accesibilidad WCAG 2.1 AA)
+- `App.jsx:56`: Eliminado `console.info` de migraciones (no mas logs en produccion)
+- `.gitignore`: Agregado `.venv/`, `mockup-landing.html`, `skills-lock.json`
+
+#### Verificacion
+
+| Check | Resultado |
+|-------|-----------|
+| Build (vite build) | 0 errores ✓ |
+| Tests (vitest run) | 46/46 passing ✓ |
+| Portal chunk | PortalHome 32.58 KB (9.33 KB gzip) ✓ |
+| Ruta / | Renderiza PortalHome ✓ |
+| Ruta /crm | Renderiza CRM completo ✓ |
+| Code-splitting | Portal lazy-loaded separado del CRM ✓ |
+
+### 2026-03-28 — VETO: Reestructuracion a Multi-Ruta (No mas One-Page)
+
+> **Directiva de Julian**: Se veta y rechaza la estructura one-page scroll. El portal debe ser una web estructurada como un holding corporativo con rutas reales y navbar sticky.
+
+#### @Arquitecto — Nueva Arquitectura de Rutas
+
+**Rutas implementadas (React Router v7 con layout anidado):**
+```
+/ (BrowserRouter)
+├── <PortalLayout>              ← Navbar sticky glassmorphism + Footer (compartido)
+│   ├── /                       → PortalHome (Hero + Ecosistema SOLAMENTE)
+│   ├── /servicios/sports-crm   → SportsCRMPage (pagina de producto completa)
+│   └── /journal                → JournalPage (pagina dedicada de noticias)
+│
+└── /crm/*                      → CRMApp (sistema de gestion, sin navbar portal)
+```
+
+**Archivos creados:**
+- `src/components/portal/PortalLayout.jsx` — Navbar sticky glassmorphism estilo NBA/holding + Outlet + Footer + AnimatePresence en transiciones de ruta + scroll-to-top automatico
+- `src/components/portal/SportsCRMPage.jsx` — Pagina de producto completa: hero, 3 modulos alternados (izq/der), stats, bottom CTA
+- `src/components/portal/JournalPage.jsx` — Pagina dedicada: featured article + grid de noticias
+
+**Archivos modificados:**
+- `src/components/portal/PortalHome.jsx` v2 — Solo Hero + Ecosistema (removidos Servicios y Journal)
+- `src/components/portal/HeroSection.jsx` — CTAs ahora navegan a rutas reales (no scroll)
+- `src/components/portal/EcosystemSection.jsx` — Panel CRM activo es clickeable → navega a /servicios/sports-crm
+- `src/App.jsx` v10 — Rutas anidadas bajo PortalLayout con Outlet
+
+**Navbar features:**
+- Sticky con glassmorphism (backdrop-blur 24px)
+- Cambio de opacidad al scroll (0.6 → 0.92)
+- NavLink activo con indicator animado (motion layoutId)
+- Logo ELEVATE + subtitulo "Sports Technology"
+- Links: Home, Sports CRM, Journal
+- CTA "Acceder" → /crm
+- Footer con links duplicados para navegacion
+
+#### Verificacion
+
+| Check | Resultado |
+|-------|-----------|
+| Build | 0 errores (642ms) ✓ |
+| Tests | 46/46 passing ✓ |
+| Ruta / | Hero + Ecosistema ✓ |
+| Ruta /servicios/sports-crm | Pagina de producto completa ✓ |
+| Ruta /journal | Pagina de noticias ✓ |
+| Navbar sticky | Funcional en todas las rutas ✓ |
+| Transiciones entre rutas | AnimatePresence fade ✓ |
+| Scroll to top on navigate | Funcional ✓ |
+
+---
+
+#### Pendientes para siguiente sprint
+
+- [ ] **BLOCKER LEY-01**: Checkbox consentimiento datos en formulario registro
+- [ ] **BLOCKER LEY-02**: Campo consent_at en tabla profiles
+- [ ] **CRITICO**: Fix healthService.js:55 (pasar athleteId a calcSaludActual)
+- [ ] **CRITICO**: Bloquear cambio role/club_id en RLS profiles (migration 004)
+- [ ] **CRITICO**: Conectar syncAthletes/syncMovement/syncPayment en componentes
+- [ ] Cargar font Barlow via @import en index.css
+- [ ] Unificar paleta LP duplicada en CommercialLanding/LegalDisclaimer
+- [ ] Confirmar migration 002 aplicada en Supabase Dashboard (accion Julian)
+- [ ] Extraer Reportes de App.jsx a archivo propio
+- [ ] Reemplazar alert() en Planificacion.jsx con logica real
+
+---
+
+### 2026-03-28 — Sprint UX Unificacion Portal + CRM
+
+#### @Arquitecto (Julian)
+- DIRECTIVA: Eliminar landing intermedia CommercialLanding del flujo /crm
+- DIRECTIVA: Unificar estética visual CRM con el Portal (glassmorphism, PALETTE)
+
+#### @Desarrollador (Andres) — Tarea 1: Eliminar CommercialLanding del flujo
+- `App.jsx`: Eliminado estado `landingStep` y bloque condicional `commercial | register`
+- Flujo `/crm` ahora va directo: sin sesion → LandingPage, con sesion → Home
+- `CommercialLanding.jsx` conservado como archivo (referencia), pero eliminado del routing
+- `MiniTopbar`: boton cambia de "← Inicio" (setActiveModule) a "← Portal" (navigate("/"))
+- `MiniTopbar`: background actualizado a glassmorphism `rgba(10,10,15,0.85)` + `backdropFilter:blur(20px)`
+
+#### @Desarrollador (Andres) — Tarea 2: Unificacion estetica CRM
+- `Home.jsx`: Topbar con glassmorphism. MetricBlocks con backdrop-blur. STATS sin hex hardcodeados.
+- `LandingPage.jsx`: Cards con glassmorphism + borderRadius:12. FormContainer con glassmorphism + borderRadius:16. Inputs con borderRadius:6.
+- `Administracion.jsx`: KPI cards con glassmorphism + borderRadius:12 + gap:8 (era gap:0). Panels y cards con glassmorphism.
+- `MiClub.jsx`: Import PALETTE. Panel con glassmorphism + borderRadius:12. Todos los hex "#1D9E75", "#E24B4A", "#059669" reemplazados por C.green, C.danger. Pills/badges con borderRadius:6-8.
+- `GestionPlantilla.jsx`: Controls bar con glassmorphism. Panel de edicion con glassmorphism.
+- `Entrenamiento.jsx`: Subtabs bar con glassmorphism. MetricBlocks con glassmorphism. Analisis KPI cards + chart panels con glassmorphism. Hex hardcodeados reemplazados por PALETTE. Nota textarea con glassmorphism.
+
+#### @QA (Sara) — Verificacion
+- Build: 0 errores, 707 modules transformados
+- Tests: 46/46 passed
+
+---
+
+---
+
+### 2026-03-28 — Sprint UI/UX: Animaciones CRM + Dropdown Servicios + Iconografía Importer
+
+> Directiva de Julian: Intervención estética en layouts internos del CRM, dropdown animado de Servicios en Navbar, e iconografía del importador de deportistas.
+
+#### @Desarrollador (Andres) — Tarea 1: Dropdown "Servicios" en PortalLayout Navbar
+
+**Componente nuevo: `ServicesDropdown`** (dentro de `PortalLayout.jsx`)
+
+- Trigger button "Servicios" con chevron animado (Framer Motion `animate: {rotate: 180}` al abrir)
+- Panel glassmorphism: `rgba(12,12,20,0.96)` + `backdropFilter:blur(24px)`, `borderRadius:12`, `boxShadow: 0 16px 48px rgba(0,0,0,0.6)`
+- `AnimatePresence` + `variants` para entrada/salida spring (stiffness:400, damping:28/35)
+- Items con stagger entrada (delay `i * 0.05s`) via `dropdownItemVariants` custom
+- 2 servicios en el panel: "Elevate Sports CRM" (tag neon) y "Journal" (tag violeta)
+- Cada item: icono SVG 40px en contenedor glassmorphism + label + descripción + tag + flecha
+- Footer CTA "Acceder al CRM" con gradiente neon→violeta
+- Cierre automático: click fuera (`mousedown` handler) y cambio de ruta (`useEffect location`)
+- Underline indicator animado (`layoutId="nav-indicator"`) cuando la ruta activa es `/servicios/*`
+- `NAV_LINKS` limpiado: "Sports CRM" removido (ya está en el dropdown), "Journal" removido (en dropdown)
+- `FOOTER_LINKS` agregado con lista completa incluyendo rutas futuras (Quiénes Somos, Contacto)
+
+**Animación variants definidas como constantes:**
+- `dropdownVariants`: `{ hidden: {opacity:0, y:-8, scale:0.97}, visible: {opacity:1, y:0, scale:1} }`
+- `dropdownItemVariants`: custom function con delay stagger por índice
+
+#### @Desarrollador (Andres) — Tarea 2: Entry Animations en módulos CRM
+
+**`Home.jsx`**:
+- Import `motion, AnimatePresence` de framer-motion
+- Definidas 3 constantes de animación: `fadeInUp` (spring 300/28), `staggerContainer`, `metricItemVariant`
+- `<motion.div variants={staggerContainer}>` envuelve la barra de METRICS — 4 KPI blocks aparecen en cascade
+- `<motion.div {...fadeInUp}>` envuelve el GRID de mosaicos — aparece con rise al montar
+
+**`Administracion.jsx`**:
+- Import `motion` (ya tenía AnimatePresence importado pero sin uso)
+- Definidas 4 constantes: `kpiStagger`, `kpiItem`, `tabPanel`, `rowVariant`
+- `<AnimatePresence mode="wait">` envuelve los 3 tabs — transición fade+y al cambiar tab
+- Tab PAGOS: KPI bar con `kpiStagger` (4 cards en cascade), rows de atletas con `rowVariant` (stagger x:-8→0)
+- Tab MOVIMIENTOS: movimientos del historial con `rowVariant` animado
+- Tab RESUMEN: 4 cards con `kpiStagger`
+
+**`GestionPlantilla.jsx`**:
+- Import `motion, AnimatePresence` de framer-motion
+- Definidas 3 constantes: `listVariants` (stagger 40ms), `rowVariant` (x:-12→0 spring), `panelVariant` (x:20→0)
+- Lista de jugadores: `<motion.div variants={listVariants}>` con cada `PlayerRow` envuelto en `<motion.div variants={rowVariant}>`
+- Panel de edición: `<AnimatePresence mode="wait">` con `key={selectedAthlete?.id ?? "empty"}` — slide desde derecha al cambiar jugador
+
+#### @Desarrollador (Andres) — Tarea 3: ImportIcons.jsx
+
+**Nuevo archivo: `src/components/ui/ImportIcons.jsx`**
+
+8 iconos SVG premium para el módulo de carga masiva de deportistas:
+
+| Ícono | Props | Uso |
+|-------|-------|-----|
+| `UploadIcon` | size, color, opacity | Zona drop + botón principal |
+| `FileIcon` | size, color, opacity | Preview del archivo seleccionado |
+| `ValidationPendingIcon` | size, color, opacity | Estado validando (círculo + 3 puntos) |
+| `SuccessIcon` | size, color, opacity | Fila válida, importación exitosa |
+| `ErrorIcon` | size, color, opacity | Fila con error, fallo importación |
+| `WarningIcon` | size, color, opacity | Campo opcional vacío (no bloqueante) |
+| `SpinnerIcon` | size, color | Carga animada (Framer Motion rotate:360 infinite) |
+| `ClearIcon` | size, color, opacity | Quitar archivo, limpiar selección |
+| `ImportBatchIcon` | size, color, opacity | Header del módulo, cilindro base de datos + flechas |
+| `TemplateDownloadIcon` | size, color, opacity | Descargar plantilla CSV |
+| `DragDropIcon` | size, color, opacity | Zona de arrastre (nube + flecha 48px) |
+
+Todos usan `PALETTE` como default de color. `SpinnerIcon` es el único con animación Framer Motion.
+
+#### Verificación
+
+| Check | Resultado |
+|-------|-----------|
+| Build (vite build) | 0 errores, 0 warnings (588ms) ✓ |
+| Tests | 46/46 (no modificado) ✓ |
+| Framer Motion | Importado y usado correctamente en 3 componentes CRM ✓ |
+| Dropdown Servicios | AnimatePresence + spring + outside click + route change ✓ |
+| ImportIcons | 11 iconos SVG puros, tipados con JSDoc, 0 emojis ✓ |
 
 ---
 

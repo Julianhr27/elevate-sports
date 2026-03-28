@@ -21,6 +21,7 @@ import { getAvatarUrl as avatar, calculateAge, getStatusStyle } from "../utils/h
 import { calcSaludActual, saludColor } from "../utils/rpeEngine";
 import useLocalStorage from "../hooks/useLocalStorage";
 import ConfirmModal from "./ConfirmModal";
+import { showToast } from "./Toast";
 
 /* ── Responsive: inyectar media query CSS una sola vez ── */
 if (typeof document !== "undefined" && !document.getElementById("tb-responsive")) {
@@ -591,7 +592,14 @@ export default function TacticalBoard({ athletes = [], historial = [] }) {
         ))}
         <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", padding:"0 14px", gap:8 }}>
           <div style={{ fontSize:9, color:C.textMuted, textTransform:"uppercase", letterSpacing:"1px" }}>{formationKey}</div>
-          <div style={{ padding:"4px 12px", fontSize:9, textTransform:"uppercase", letterSpacing:"1px", background:C.amber, color:"#1a0f00", cursor:"pointer", fontWeight:700 }}>Usar en partido</div>
+          <motion.div
+            onClick={() => showToast("Modulo 'Usar en partido' disponible en V9", "info")}
+            whileHover={{ scale: 1.04 }}
+            whileTap={{ scale: 0.96 }}
+            style={{ padding:"4px 12px", fontSize:9, textTransform:"uppercase", letterSpacing:"1px", background:C.amber, color:"#1a0f00", cursor:"pointer", fontWeight:700 }}
+          >
+            Usar en partido
+          </motion.div>
         </div>
       </div>
 

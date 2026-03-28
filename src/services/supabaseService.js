@@ -154,6 +154,69 @@ export async function syncAthletes(athletes) {
 }
 
 // ════════════════════════════════════════════════
+// BULK INSERT ATHLETES
+// ════════════════════════════════════════════════
+
+/**
+ * Inserta deportistas en lote (carga masiva).
+ * Vincula cada fila al club_id activo. Registra log de upload.
+ * @param {Array} athletes - Filas validadas del parser CSV
+ * @param {string} [fileName] - Nombre del archivo original
+ * @param {number} [invalidCount] - Cantidad de filas invalidas (para log)
+ * @returns {Promise<{ success: boolean, inserted: number, errors: string[] }>}
+ */
+export async function bulkInsertAthletes(athletes, fileName = "bulk_upload.csv", invalidCount = 0) {
+  if (!isSupabaseReady || !_clubId) return { success: false, inserted: 0, errors: ["Supabase no disponible o club_id no definido"] };
+  if (!athletes?.length) return { success: false, inserted: 0, errors: ["No hay atletas para insertar"] };
+
+  const errors = [];
+
+  // Mapear filas del parser al schema de athletes
+  const rows = athletes.map(a => ({
+    club_id: _clubId,
+    name: a.nombre || "",
+    apellido: a.apellido || "",
+    pos: a.posicion || "GEN",
+    pos_code: a.posicion || "GEN",
+    dob: a.fecha_nacimiento || null,
+    numero_dorsal: a.dorsal || null,
+    documento_identidad: a.documento_identidad || "",
+    contacto_emergencia: a.contacto_emergencia || "",
+    contact: a.contacto_emergencia || "",
+    status: "P",
+    available: true,
+  }));
+
+  // Insertar en lote
+  const { data, error } = await supabase.from("athletes").insert(rows).select("id");
+
+  if (error) {
+    reportError("Error en carga masiva de atletas", error);
+    errors.push(error.message);
+  }
+
+  const inserted = data?.length || 0;
+  const status = error ? "failed" : (invalidCount > 0 ? "partial" : "success");
+
+  // Registrar log de upload
+  try {
+    await supabase.from("bulk_upload_logs").insert({
+      club_id: _clubId,
+      file_name: fileName,
+      total_rows: athletes.length + invalidCount,
+      valid_rows: inserted,
+      invalid_rows: invalidCount,
+      status,
+      error_details: errors.length ? errors : [],
+    });
+  } catch (logErr) {
+    console.warn("[bulkInsert] No se pudo registrar log de upload", logErr);
+  }
+
+  return { success: !error, inserted, errors };
+}
+
+// ════════════════════════════════════════════════
 // SESSIONS (historial)
 // ════════════════════════════════════════════════
 

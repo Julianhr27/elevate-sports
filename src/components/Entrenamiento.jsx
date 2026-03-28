@@ -164,12 +164,12 @@ export default function Entrenamiento({ athletes, setAthletes, historial, onGuar
       {/* MÉTRICAS */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))", gap:2 }}>
         {[
-          { label:"Presentes", value:stats.presentes, color:"#1D9E75", border:"#1D9E75" },
-          { label:"Ausentes", value:stats.ausentes, color:"#E24B4A", border:"#E24B4A" },
-          { label:"RPE promedio", value:stats.rpeAvg, color:"#EF9F27", border:"#EF9F27" },
-          { label:"Sesión", value:`#${(historial[0]?.num || 0) + 1}`, color:"#7F77DD", border:"#7F77DD" },
+          { label:"Presentes", value:stats.presentes, color:PALETTE.green, border:PALETTE.green },
+          { label:"Ausentes", value:stats.ausentes, color:PALETTE.danger, border:PALETTE.danger },
+          { label:"RPE promedio", value:stats.rpeAvg, color:PALETTE.amber, border:PALETTE.amber },
+          { label:"Sesión", value:`#${(historial[0]?.num || 0) + 1}`, color:PALETTE.purple, border:PALETTE.purple },
         ].map((m,i) => (
-          <div key={i} style={{ padding:"10px 16px", background:"rgba(0,0,0,0.82)", borderBottom:`3px solid ${m.border}`, display:"flex", alignItems:"center", gap:12 }}>
+          <div key={i} style={{ padding:"10px 16px", background:"rgba(255,255,255,0.03)", backdropFilter:"blur(16px)", WebkitBackdropFilter:"blur(16px)", borderBottom:`3px solid ${m.border}`, border:`1px solid ${PALETTE.border}`, display:"flex", alignItems:"center", gap:12 }}>
             <div style={{ fontSize:22, fontWeight:500, color:m.color }}>{m.value}</div>
             <div style={{ fontSize:9, textTransform:"uppercase", letterSpacing:"1px", color:"rgba(255,255,255,0.3)" }}>{m.label}</div>
           </div>
@@ -177,9 +177,9 @@ export default function Entrenamiento({ athletes, setAthletes, historial, onGuar
       </div>
 
       {/* SUBTABS */}
-      <div style={{ display:"flex", alignItems:"stretch", height:34, background:"rgba(0,0,0,0.75)", borderBottom:"1px solid rgba(255,255,255,0.07)", padding:"0 16px" }}>
+      <div style={{ display:"flex", alignItems:"stretch", height:34, background:"rgba(10,10,15,0.85)", backdropFilter:"blur(20px)", WebkitBackdropFilter:"blur(20px)", borderBottom:`1px solid ${PALETTE.border}`, padding:"0 16px" }}>
         {[["sesion","Sesión de hoy"],["planificacion","Planificación"],["historial","Historial"],["analisis","Análisis"]].map(([k,l]) => (
-          <div key={k} onClick={() => setTab(k)} style={{ fontSize:10, textTransform:"uppercase", letterSpacing:"1.5px", color: tab===k ? "#1D9E75" : "rgba(255,255,255,0.3)", display:"flex", alignItems:"center", padding:"0 14px", cursor:"pointer", borderBottom: tab===k ? "2px solid #1D9E75" : "2px solid transparent" }}>
+          <div key={k} onClick={() => setTab(k)} style={{ fontSize:10, textTransform:"uppercase", letterSpacing:"1.5px", color: tab===k ? PALETTE.green : PALETTE.textMuted, display:"flex", alignItems:"center", padding:"0 14px", cursor:"pointer", borderBottom: tab===k ? `2px solid ${PALETTE.green}` : "2px solid transparent" }}>
             {l}
           </div>
         ))}
@@ -191,7 +191,7 @@ export default function Entrenamiento({ athletes, setAthletes, historial, onGuar
             <select value={tipo} onChange={e=>setTipo(e.target.value)} style={{ ...inp, width:"auto", fontSize:10, padding:"3px 8px" }}>
               {["Táctica","Físico","Recuperación","Partido interno"].map(t=><option key={t}>{t}</option>)}
             </select>
-            <div onClick={() => onGuardar(nota, tipo)} style={{ background:"#1D9E75", color:"white", fontSize:9, textTransform:"uppercase", letterSpacing:"1px", padding:"5px 14px", cursor:"pointer", whiteSpace:"nowrap" }}>
+            <div onClick={() => onGuardar(nota, tipo)} style={{ background:PALETTE.green, color:"white", fontSize:9, textTransform:"uppercase", letterSpacing:"1px", padding:"5px 14px", cursor:"pointer", whiteSpace:"nowrap", borderRadius:6 }}>
               Guardar sesión →
             </div>
           </div>
@@ -209,7 +209,7 @@ export default function Entrenamiento({ athletes, setAthletes, historial, onGuar
               const presente = a.status === "P";
               const ausente = a.status === "A";
               const lesionado = a.status === "L";
-              const borderColor = presente ? "#1D9E75" : ausente ? "#E24B4A" : lesionado ? "#EF9F27" : "rgba(255,255,255,0.1)";
+              const borderColor = presente ? PALETTE.green : ausente ? PALETTE.danger : lesionado ? PALETTE.amber : PALETTE.border;
               const bgColor = presente ? "rgba(4,30,18,0.95)" : ausente ? "rgba(30,4,4,0.95)" : lesionado ? "rgba(30,18,4,0.95)" : "rgba(8,18,8,0.95)";
               const opacity = ausente || lesionado ? 0.72 : 1;
               const photoBg = ausente || lesionado ? "555" : "059669";
@@ -232,7 +232,7 @@ export default function Entrenamiento({ athletes, setAthletes, historial, onGuar
                       <div style={{ fontSize:8, color:"rgba(255,255,255,0.3)", textTransform:"uppercase", letterSpacing:"0.5px", marginTop:1 }}>{a.posCode}</div>
                     </div>
                     <div style={{ display:"flex", gap:1, padding:"0 6px 6px" }}>
-                      {[["P","#1D9E75","white"],["A","#E24B4A","white"],["L","#EF9F27","#1a0f00"]].map(([s,bg,tc]) => (
+                      {[["P",PALETTE.green,"white"],["A",PALETTE.danger,"white"],["L",PALETTE.amber,"#1a0f00"]].map(([s,bg,tc]) => (
                         <div key={s} onClick={() => setStatus(i, s)} style={{ flex:1, fontSize:8, padding:"3px 0", textAlign:"center", cursor:"pointer", textTransform:"uppercase", background: a.status===s ? bg : "rgba(255,255,255,0.05)", color: a.status===s ? tc : "rgba(255,255,255,0.3)" }}>
                           {s}
                         </div>
@@ -258,7 +258,7 @@ export default function Entrenamiento({ athletes, setAthletes, historial, onGuar
               );
             })}
           </div>
-          <div style={{ background:"rgba(0,0,0,0.5)", borderLeft:"3px solid #1D9E75", padding:"10px 14px" }}>
+          <div style={{ background:"rgba(255,255,255,0.03)", backdropFilter:"blur(16px)", WebkitBackdropFilter:"blur(16px)", border:`1px solid ${PALETTE.border}`, borderLeft:`3px solid ${PALETTE.green}`, borderRadius:8, padding:"10px 14px" }}>
             <textarea value={nota} onChange={e=>setNota(sanitizeNote(e.target.value))} placeholder="Nota general de la sesion..." rows={2} style={{ ...inp, background:"transparent", border:"none", resize:"none", lineHeight:1.6 }} maxLength={500}/>
           </div>
         </div>
@@ -363,12 +363,12 @@ export default function Entrenamiento({ athletes, setAthletes, historial, onGuar
             {/* KPIs reales */}
             <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))", gap:10, marginBottom:16 }}>
               {[
-                { label:"Asistencia promedio", value: asistenciaGlobal + "%", color:"#1D9E75" },
+                { label:"Asistencia promedio", value: asistenciaGlobal + "%", color:PALETTE.green },
                 { label:"RPE promedio", value: rpeGlobal, color:"white" },
-                { label:"Pico RPE", value: picoRpe, color:"#EF9F27" },
+                { label:"Pico RPE", value: picoRpe, color:PALETTE.amber },
                 { label:"Sesiones totales", value: totalSesiones, color:"white" },
               ].map((m,i) => (
-                <div key={i} style={{ background:"rgba(0,0,0,0.75)", border:"1px solid rgba(255,255,255,0.07)", padding:14 }}>
+                <div key={i} style={{ background:"rgba(255,255,255,0.03)", backdropFilter:"blur(16px)", WebkitBackdropFilter:"blur(16px)", border:`1px solid ${PALETTE.border}`, borderRadius:12, padding:14, boxShadow:"0 8px 32px rgba(0,0,0,0.4)" }}>
                   <div style={{ fontSize:9, textTransform:"uppercase", letterSpacing:"1px", color:"rgba(255,255,255,0.3)", marginBottom:8 }}>{m.label}</div>
                   <div style={{ fontSize:24, fontWeight:500, color:m.color }}>{m.value}</div>
                 </div>
@@ -377,8 +377,8 @@ export default function Entrenamiento({ athletes, setAthletes, historial, onGuar
 
             {/* Grafico de barras verticales: Tecnico vs Fisico vs Competitivo vs Recuperacion */}
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:16 }}>
-              <div style={{ background:"rgba(0,0,0,0.75)", border:"1px solid rgba(255,255,255,0.07)", padding:16 }}>
-                <div style={{ fontSize:9, textTransform:"uppercase", letterSpacing:"2px", color:"rgba(255,255,255,0.3)", marginBottom:16 }}>
+              <div style={{ background:"rgba(255,255,255,0.03)", backdropFilter:"blur(16px)", WebkitBackdropFilter:"blur(16px)", border:`1px solid ${PALETTE.border}`, borderRadius:12, padding:16, boxShadow:"0 8px 32px rgba(0,0,0,0.4)" }}>
+                <div style={{ fontSize:9, textTransform:"uppercase", letterSpacing:"2px", color:PALETTE.textMuted, marginBottom:16 }}>
                   Distribucion por categoria
                 </div>
                 <div style={{ display:"flex", alignItems:"flex-end", justifyContent:"space-around", height:120, gap:8 }}>
@@ -396,15 +396,15 @@ export default function Entrenamiento({ athletes, setAthletes, historial, onGuar
               </div>
 
               {/* RPE promedio por categoria */}
-              <div style={{ background:"rgba(0,0,0,0.75)", border:"1px solid rgba(255,255,255,0.07)", padding:16 }}>
-                <div style={{ fontSize:9, textTransform:"uppercase", letterSpacing:"2px", color:"rgba(255,255,255,0.3)", marginBottom:16 }}>
+              <div style={{ background:"rgba(255,255,255,0.03)", backdropFilter:"blur(16px)", WebkitBackdropFilter:"blur(16px)", border:`1px solid ${PALETTE.border}`, borderRadius:12, padding:16, boxShadow:"0 8px 32px rgba(0,0,0,0.4)" }}>
+                <div style={{ fontSize:9, textTransform:"uppercase", letterSpacing:"2px", color:PALETTE.textMuted, marginBottom:16 }}>
                   RPE promedio por categoria
                 </div>
                 <div style={{ display:"flex", alignItems:"flex-end", justifyContent:"space-around", height:120, gap:8 }}>
                   {Object.entries(categorias).map(([cat, cfg]) => {
                     const avg = cfg.rpeN > 0 ? (cfg.rpeSum / cfg.rpeN) : 0;
                     const h = avg > 0 ? Math.max((avg / 10) * 100, 8) : 0;
-                    const rpeColor = avg <= 3 ? "#1D9E75" : avg <= 7 ? "#EF9F27" : "#E24B4A";
+                    const rpeColor = avg <= 3 ? PALETTE.green : avg <= 7 ? PALETTE.amber : PALETTE.danger;
                     return (
                       <div key={cat} style={{ display:"flex", flexDirection:"column", alignItems:"center", flex:1, height:"100%", justifyContent:"flex-end" }}>
                         <div style={{ fontSize:12, fontWeight:700, color: rpeColor, marginBottom:4 }}>{avg > 0 ? avg.toFixed(1) : "—"}</div>
@@ -418,8 +418,8 @@ export default function Entrenamiento({ athletes, setAthletes, historial, onGuar
             </div>
 
             {/* Barras horizontales por tipo detallado */}
-            <div style={{ background:"rgba(0,0,0,0.75)", border:"1px solid rgba(255,255,255,0.07)", padding:16 }}>
-              <div style={{ fontSize:9, textTransform:"uppercase", letterSpacing:"2px", color:"rgba(255,255,255,0.3)", marginBottom:14 }}>
+            <div style={{ background:"rgba(255,255,255,0.03)", backdropFilter:"blur(16px)", WebkitBackdropFilter:"blur(16px)", border:`1px solid ${PALETTE.border}`, borderRadius:12, padding:16, boxShadow:"0 8px 32px rgba(0,0,0,0.4)" }}>
+              <div style={{ fontSize:9, textTransform:"uppercase", letterSpacing:"2px", color:PALETTE.textMuted, marginBottom:14 }}>
                 Detalle por tipo de tarea
               </div>
               {tipoStats.length === 0 && (

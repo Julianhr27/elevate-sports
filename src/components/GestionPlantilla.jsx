@@ -23,12 +23,35 @@
  * @author   Elevate Sports
  */
 
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import TacticalBoard from "./TacticalBoard";
+import BulkAthleteUploader from "./BulkAthleteUploader";
 import { PALETTE } from "../constants/palette";
 import { FORMATIONS_VERTICAL as FORMATIONS } from "../constants/formations";
 import { getAvatarUrl, getStatusStyle } from "../utils/helpers";
+import { sanitizeText, sanitizeTextFinal } from "../utils/sanitize";
+import { showToast } from "./Toast";
+import { insertAthlete, bulkInsertAthletes, saveTacticalData } from "../services/supabaseService";
 
+
+// ─────────────────────────────────────────────
+// ANIMATION VARIANTS
+// ─────────────────────────────────────────────
+const listVariants = {
+  animate: { transition: { staggerChildren: 0.04 } },
+};
+
+const rowVariant = {
+  initial: { opacity: 0, x: -12 },
+  animate: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 340, damping: 28 } },
+};
+
+const panelVariant = {
+  initial: { opacity: 0, x: 20 },
+  animate: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 320, damping: 28 } },
+  exit:    { opacity: 0, x: 20, transition: { duration: 0.18 } },
+};
 
 // ─────────────────────────────────────────────
 // SUB-COMPONENTES
@@ -305,6 +328,345 @@ function PlayerEditPanel({ athlete, onUpdate, onClose }) {
   );
 }
 
+// ── Posiciones disponibles (16 pos_codes del dominio) ───────────────────────
+const POS_OPTIONS = [
+  { code: "GK",  label: "Portero (GK)"            },
+  { code: "CB",  label: "Defensa central (CB)"    },
+  { code: "LB",  label: "Lateral izquierdo (LB)"  },
+  { code: "RB",  label: "Lateral derecho (RB)"    },
+  { code: "LWB", label: "Carrilero izq. (LWB)"    },
+  { code: "RWB", label: "Carrilero der. (RWB)"    },
+  { code: "CDM", label: "Mediocampista def. (CDM)" },
+  { code: "CM",  label: "Mediocampista (CM)"       },
+  { code: "CAM", label: "Mediapunta (CAM)"         },
+  { code: "LM",  label: "Extremo izq. med. (LM)"  },
+  { code: "RM",  label: "Extremo der. med. (RM)"  },
+  { code: "LW",  label: "Extremo izquierdo (LW)"  },
+  { code: "RW",  label: "Extremo derecho (RW)"    },
+  { code: "SS",  label: "Segundo delantero (SS)"  },
+  { code: "ST",  label: "Delantero centro (ST)"   },
+  { code: "CF",  label: "Centro delantero (CF)"   },
+];
+
+const EMPTY_DRAFT = {
+  nombre: "", apellido: "", posCode: "ST",
+  dorsal: "", dob: "", contacto: "", documento: "",
+};
+
+/**
+ * @component AddAthleteModal
+ * @description Modal glassmorphism para crear un deportista individual.
+ * Usa sanitizeText en onChange y sanitizeTextFinal en submit.
+ * Llama a insertAthlete() de supabaseService y actualiza estado local.
+ */
+function AddAthleteModal({ onClose, onSave }) {
+  const [draft, setDraft] = useState(EMPTY_DRAFT);
+  const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
+
+  const set = (field) => (e) => {
+    const value = (field === "dob")
+      ? e.target.value
+      : sanitizeText(e.target.value);
+    setDraft((prev) => ({ ...prev, [field]: value }));
+    if (errors[field]) setErrors((prev) => ({ ...prev, [field]: "" }));
+  };
+
+  const validate = () => {
+    const errs = {};
+    const nombre   = sanitizeTextFinal(draft.nombre);
+    const apellido = sanitizeTextFinal(draft.apellido);
+    if (!nombre || nombre.length < 2) errs.nombre = "Obligatorio";
+    if (!apellido || apellido.length < 2) errs.apellido = "Obligatorio";
+    if (!draft.posCode) errs.posCode = "Obligatorio";
+    if (draft.dorsal && (isNaN(+draft.dorsal) || +draft.dorsal < 1 || +draft.dorsal > 99))
+      errs.dorsal = "1–99";
+    return errs;
+  };
+
+  const handleSave = async () => {
+    const errs = validate();
+    if (Object.keys(errs).length > 0) { setErrors(errs); return; }
+
+    setSaving(true);
+    const posOpt = POS_OPTIONS.find((p) => p.code === draft.posCode);
+    const newAthlete = {
+      name:               `${sanitizeTextFinal(draft.nombre)} ${sanitizeTextFinal(draft.apellido)}`.trim(),
+      pos:                posOpt?.label || draft.posCode,
+      posCode:            draft.posCode,
+      id:                 draft.dorsal ? +draft.dorsal : Math.floor(Math.random() * 900) + 100,
+      dob:                draft.dob || null,
+      contact:            sanitizeTextFinal(draft.contacto) || "",
+      documento_identidad: sanitizeTextFinal(draft.documento) || "",
+      status:             "P",
+      available:          true,
+      goals:              0,
+      yellowCards:        0,
+      redCards:           0,
+    };
+
+    // Intentar persistir en Supabase; si no hay conexion, solo local
+    const saved = await insertAthlete(newAthlete);
+    if (saved) {
+      onSave(saved);
+      showToast(`Deportista ${newAthlete.name} creado en la nube`, "success");
+    } else {
+      // Fallback offline-first
+      onSave({ ...newAthlete, _localOnly: true });
+      showToast(`Deportista ${newAthlete.name} guardado localmente`, "info");
+    }
+    setSaving(false);
+    onClose();
+  };
+
+  const fieldStyle = (hasErr) => ({
+    background: "rgba(255,255,255,0.05)",
+    border: `1px solid ${hasErr ? PALETTE.danger : "rgba(255,255,255,0.12)"}`,
+    padding: "8px 12px", fontSize: 12,
+    color: PALETTE.text, fontFamily: "inherit",
+    outline: "none", width: "100%", boxSizing: "border-box",
+    borderRadius: 4, transition: "border-color 200ms",
+  });
+
+  const labelStyle = (hasErr) => ({
+    fontSize: 8, textTransform: "uppercase", letterSpacing: "1.2px",
+    color: hasErr ? PALETTE.danger : PALETTE.textHint,
+    marginBottom: 5, fontWeight: 600,
+    display: "block",
+  });
+
+  return (
+    <div
+      style={{
+        position: "fixed", inset: 0, zIndex: 200,
+        background: "rgba(0,0,0,0.72)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 20,
+      }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 16 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ type: "spring", stiffness: 360, damping: 28 }}
+        style={{
+          background: "rgba(12,12,22,0.97)",
+          backdropFilter: "blur(24px)",
+          WebkitBackdropFilter: "blur(24px)",
+          border: "1px solid rgba(255,255,255,0.1)",
+          borderTop: `2px solid ${PALETTE.neon}`,
+          borderRadius: 10,
+          width: "100%", maxWidth: 520,
+          boxShadow: "0 24px 64px rgba(0,0,0,0.7)",
+        }}
+      >
+        {/* Header */}
+        <div style={{
+          padding: "18px 24px 14px",
+          borderBottom: `1px solid ${PALETTE.border}`,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: PALETTE.text }}>
+              Agregar deportista
+            </div>
+            <div style={{ fontSize: 9, color: PALETTE.textHint, textTransform: "uppercase", letterSpacing: "1.5px", marginTop: 3 }}>
+              Nuevo registro en el plantel
+            </div>
+          </div>
+          <div
+            onClick={onClose}
+            style={{ fontSize: 16, color: PALETTE.textMuted, cursor: "pointer", padding: "4px 8px" }}
+          >
+            ✕
+          </div>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: "22px 24px", display: "flex", flexDirection: "column", gap: 18 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div>
+              <label style={labelStyle(!!errors.nombre)}>Nombre *</label>
+              <input type="text" placeholder="Julian" value={draft.nombre} onChange={set("nombre")} style={fieldStyle(!!errors.nombre)} />
+              {errors.nombre && <div style={{ fontSize: 9, color: PALETTE.danger, marginTop: 4 }}>{errors.nombre}</div>}
+            </div>
+            <div>
+              <label style={labelStyle(!!errors.apellido)}>Apellido *</label>
+              <input type="text" placeholder="Perez" value={draft.apellido} onChange={set("apellido")} style={fieldStyle(!!errors.apellido)} />
+              {errors.apellido && <div style={{ fontSize: 9, color: PALETTE.danger, marginTop: 4 }}>{errors.apellido}</div>}
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 100px", gap: 16 }}>
+            <div>
+              <label style={labelStyle(!!errors.posCode)}>Posicion *</label>
+              <select
+                value={draft.posCode}
+                onChange={set("posCode")}
+                style={{ ...fieldStyle(!!errors.posCode), background: "rgba(20,20,32,0.95)", cursor: "pointer" }}
+              >
+                {POS_OPTIONS.map((p) => (
+                  <option key={p.code} value={p.code}>{p.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle(!!errors.dorsal)}>Dorsal</label>
+              <input type="number" min="1" max="99" placeholder="10" value={draft.dorsal} onChange={set("dorsal")} style={fieldStyle(!!errors.dorsal)} />
+              {errors.dorsal && <div style={{ fontSize: 9, color: PALETTE.danger, marginTop: 4 }}>{errors.dorsal}</div>}
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <div>
+              <label style={labelStyle(false)}>Fecha de nacimiento</label>
+              <input type="date" value={draft.dob} onChange={set("dob")} style={fieldStyle(false)} />
+            </div>
+            <div>
+              <label style={labelStyle(false)}>Contacto</label>
+              <input type="text" placeholder="+57 300 0000000" value={draft.contacto} onChange={set("contacto")} style={fieldStyle(false)} />
+            </div>
+          </div>
+
+          <div>
+            <label style={labelStyle(false)}>Documento de identidad</label>
+            <input type="text" placeholder="1234567890" value={draft.documento} onChange={set("documento")} style={fieldStyle(false)} />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{
+          padding: "14px 24px 18px",
+          borderTop: `1px solid ${PALETTE.border}`,
+          display: "flex", gap: 10,
+        }}>
+          <motion.div
+            onClick={saving ? undefined : handleSave}
+            whileHover={saving ? {} : { scale: 1.02 }}
+            whileTap={saving ? {} : { scale: 0.98 }}
+            style={{
+              flex: 1, padding: "10px 0",
+              background: saving ? `${PALETTE.neon}60` : PALETTE.neon,
+              color: "#0a0a0a", fontSize: 11, fontWeight: 700,
+              textTransform: "uppercase", letterSpacing: "1.5px",
+              cursor: saving ? "not-allowed" : "pointer",
+              textAlign: "center", borderRadius: 4,
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            }}
+          >
+            {saving ? (
+              <>
+                <div style={{
+                  width: 12, height: 12,
+                  border: "2px solid #0a0a0a",
+                  borderTop: "2px solid transparent",
+                  borderRadius: "50%",
+                  animation: "spin 0.8s linear infinite",
+                }} />
+                <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+                Guardando...
+              </>
+            ) : "Guardar deportista"}
+          </motion.div>
+          <div
+            onClick={onClose}
+            style={{
+              padding: "10px 20px",
+              background: "transparent",
+              border: `1px solid rgba(255,255,255,0.15)`,
+              color: PALETTE.textMuted, fontSize: 11,
+              textTransform: "uppercase", letterSpacing: "1px",
+              cursor: "pointer", textAlign: "center", borderRadius: 4,
+            }}
+          >
+            Cancelar
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+/**
+ * @component BulkUploaderModal
+ * @description Wrapper modal para BulkAthleteUploader.
+ * Conecta onCommit con bulkInsertAthletes() de supabaseService.
+ */
+function BulkUploaderModal({ onClose, onSaveAll }) {
+  const handleCommit = async (validRows) => {
+    if (!validRows.length) { showToast("No hay filas validas para importar", "warning"); return; }
+
+    const result = await bulkInsertAthletes(validRows, "import.csv", 0);
+    if (result.success) {
+      showToast(`${result.inserted} deportistas importados correctamente`, "success");
+      // Convertir filas al schema local y propagar al estado
+      const newAthletes = validRows.map((r, i) => ({
+        name: `${r.nombre || ""} ${r.apellido || ""}`.trim() || r.name || "",
+        pos: r.posicion || r.pos || "General",
+        posCode: r.posicion || r.posCode || "GEN",
+        id: r.dorsal || (200 + i),
+        dob: r.fecha_nacimiento || r.dob || null,
+        contact: r.contacto_emergencia || r.contact || "",
+        status: "P", available: true,
+        goals: 0, yellowCards: 0, redCards: 0,
+      }));
+      onSaveAll(newAthletes);
+    } else {
+      showToast(`Error en importacion: ${result.errors.join(", ")}`, "error");
+    }
+    onClose();
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed", inset: 0, zIndex: 200,
+        background: "rgba(0,0,0,0.80)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 24,
+      }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 16 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ type: "spring", stiffness: 360, damping: 28 }}
+        style={{
+          width: "100%", maxWidth: 760,
+          background: "rgba(12,12,22,0.98)",
+          backdropFilter: "blur(24px)",
+          WebkitBackdropFilter: "blur(24px)",
+          border: "1px solid rgba(255,255,255,0.1)",
+          borderTop: `2px solid ${PALETTE.purple}`,
+          borderRadius: 10,
+          boxShadow: "0 24px 64px rgba(0,0,0,0.8)",
+          overflow: "hidden",
+        }}
+      >
+        {/* Header */}
+        <div style={{
+          padding: "16px 22px",
+          borderBottom: `1px solid ${PALETTE.border}`,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: PALETTE.text }}>
+            Importar deportistas desde CSV
+          </div>
+          <div onClick={onClose} style={{ fontSize: 16, color: PALETTE.textMuted, cursor: "pointer", padding: "2px 8px" }}>✕</div>
+        </div>
+        <div style={{ padding: "16px 22px 22px" }}>
+          <BulkAthleteUploader
+            onCommit={handleCommit}
+            onCancel={onClose}
+          />
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 /**
  * @component PlayerListView
  * @description Vista de lista completa del plantel estilo FIFA.
@@ -312,10 +674,12 @@ function PlayerEditPanel({ athlete, onUpdate, onClose }) {
  * tarjetas amarillas/rojas, goles, estado.
  * Panel derecho: edición del jugador seleccionado.
  */
-function PlayerListView({ athletes, onUpdateAthlete }) {
+function PlayerListView({ athletes, onUpdateAthlete, onAddAthlete, onAddBulk }) {
   const [selectedAthlete, setSelectedAthlete] = useState(null);
   const [sortKey, setSortKey]                 = useState("posCode");
   const [filterStatus, setFilterStatus]       = useState("all");
+  const [showAddModal, setShowAddModal]       = useState(false);
+  const [showBulkModal, setShowBulkModal]     = useState(false);
 
   // Ordena y filtra la lista de forma derivada (sin estado extra)
   const displayedAthletes = [...athletes]
@@ -342,12 +706,12 @@ function PlayerListView({ athletes, onUpdateAthlete }) {
       {/* ── LISTA ─────────────────────────────── */}
       <div style={{ display:"flex", flexDirection:"column", minHeight:0 }}>
 
-        {/* Controles de filtro y orden */}
-        <div style={{ padding:"8px 12px", background:"rgba(0,0,0,0.7)", borderBottom:`1px solid ${PALETTE.border}`, display:"flex", alignItems:"center", gap:12 }}>
+        {/* Controles de filtro, orden y acciones */}
+        <div style={{ padding:"8px 12px", background:"rgba(10,10,15,0.85)", backdropFilter:"blur(20px)", WebkitBackdropFilter:"blur(20px)", borderBottom:`1px solid ${PALETTE.border}`, display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
           <div style={{ fontSize:9, color: PALETTE.textMuted, textTransform:"uppercase", letterSpacing:"1px" }}>
             {displayedAthletes.length} jugadores
           </div>
-          <div style={{ display:"flex", gap:6, marginLeft:"auto" }}>
+          <div style={{ display:"flex", gap:6 }}>
             {[["all","Todos"],["P","Disponibles"],["L","Lesionados"],["A","Ausentes"]].map(([v,l]) => (
               <div
                 key={v}
@@ -358,7 +722,70 @@ function PlayerListView({ athletes, onUpdateAthlete }) {
               </div>
             ))}
           </div>
+          {/* Action buttons — pushed to the right */}
+          <div style={{ display:"flex", gap:8, marginLeft:"auto" }}>
+            <motion.div
+              onClick={() => setShowBulkModal(true)}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              style={{
+                fontSize: 9, padding: "4px 12px", cursor: "pointer",
+                textTransform: "uppercase", letterSpacing: "1px",
+                background: "transparent",
+                border: `1px solid ${PALETTE.purple}`,
+                color: PALETTE.purple, borderRadius: 3,
+                display: "flex", alignItems: "center", gap: 5,
+              }}
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke={PALETTE.purple} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Importar CSV
+            </motion.div>
+            <motion.div
+              onClick={() => setShowAddModal(true)}
+              whileHover={{ scale: 1.03, boxShadow: `0 0 12px ${PALETTE.neonGlow}` }}
+              whileTap={{ scale: 0.97 }}
+              style={{
+                fontSize: 9, padding: "4px 14px", cursor: "pointer",
+                textTransform: "uppercase", letterSpacing: "1px",
+                background: PALETTE.neon,
+                border: "none",
+                color: "#0a0a0a", borderRadius: 3, fontWeight: 700,
+                display: "flex", alignItems: "center", gap: 5,
+              }}
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+                <path d="M12 5v14M5 12h14" stroke="#0a0a0a" strokeWidth="2.5" strokeLinecap="round"/>
+              </svg>
+              Agregar deportista
+            </motion.div>
+          </div>
         </div>
+
+        {/* Modals */}
+        <AnimatePresence>
+          {showAddModal && (
+            <AddAthleteModal
+              onClose={() => setShowAddModal(false)}
+              onSave={(newAthlete) => {
+                onAddAthlete(newAthlete);
+                setShowAddModal(false);
+              }}
+            />
+          )}
+        </AnimatePresence>
+        <AnimatePresence>
+          {showBulkModal && (
+            <BulkUploaderModal
+              onClose={() => setShowBulkModal(false)}
+              onSaveAll={(newAthletes) => {
+                onAddBulk(newAthletes);
+                setShowBulkModal(false);
+              }}
+            />
+          )}
+        </AnimatePresence>
 
         {/* Cabecera de la tabla */}
         <div style={{ display:"grid", gridTemplateColumns:"32px 28px 1fr 80px 30px 30px 30px 60px", padding:"6px 12px", background:"rgba(0,0,0,0.6)", borderBottom:`1px solid ${PALETTE.border}` }}>
@@ -372,31 +799,46 @@ function PlayerListView({ athletes, onUpdateAthlete }) {
           <div style={{ fontSize:8, textTransform:"uppercase", letterSpacing:"1px", color: PALETTE.textHint, textAlign:"right" }}>Estado</div>
         </div>
 
-        {/* Filas de jugadores */}
-        <div style={{ flex:1, overflowY:"auto" }}>
+        {/* Filas de jugadores — staggered entry */}
+        <motion.div
+          variants={listVariants}
+          initial="initial"
+          animate="animate"
+          style={{ flex:1, overflowY:"auto" }}
+        >
           {displayedAthletes.map((a, i) => (
-            <PlayerRow
-              key={a.id}
-              athlete={a}
-              index={i}
-              isSelected={selectedAthlete?.id === a.id}
-              onSelect={setSelectedAthlete}
-            />
+            <motion.div key={a.id} variants={rowVariant}>
+              <PlayerRow
+                athlete={a}
+                index={i}
+                isSelected={selectedAthlete?.id === a.id}
+                onSelect={setSelectedAthlete}
+              />
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       </div>
 
-      {/* ── PANEL EDICIÓN ─────────────────────── */}
-      <div style={{ background:"rgba(0,0,0,0.88)", borderLeft:`1px solid ${PALETTE.border}` }}>
-        <PlayerEditPanel
-          athlete={selectedAthlete}
-          onUpdate={(updated) => {
-            onUpdateAthlete(updated);
-            setSelectedAthlete(updated);
-          }}
-          onClose={() => setSelectedAthlete(null)}
-        />
-      </div>
+      {/* ── PANEL EDICIÓN — slide in from right ── */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={selectedAthlete?.id ?? "empty"}
+          variants={panelVariant}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          style={{ background:"rgba(255,255,255,0.03)", backdropFilter:"blur(16px)", WebkitBackdropFilter:"blur(16px)", borderLeft:`1px solid ${PALETTE.border}` }}
+        >
+          <PlayerEditPanel
+            athlete={selectedAthlete}
+            onUpdate={(updated) => {
+              onUpdateAthlete(updated);
+              setSelectedAthlete(updated);
+            }}
+            onClose={() => setSelectedAthlete(null)}
+          />
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }
@@ -410,6 +852,43 @@ function TacticalBoardView({ athletes }) {
   const [formation,    setFormation]    = useState("4-3-3");
   const [selectedIdx,  setSelectedIdx]  = useState(null);
   const [tacticalNote, setTacticalNote] = useState("");
+  const [savingTactics, setSavingTactics] = useState(false);
+  const [exportingPDF,  setExportingPDF]  = useState(false);
+  const fieldRef = useRef(null);
+
+  /** Guarda formacion y notas en Supabase */
+  const handleSaveFormation = async () => {
+    if (savingTactics) return;
+    setSavingTactics(true);
+    const starters = athletes.filter(a => a.available).slice(0, 11);
+    const rolesData = starters.reduce((acc, a, i) => {
+      acc[i] = { id: a.id, name: a.name, posCode: a.posCode };
+      return acc;
+    }, {});
+    const ok = await saveTacticalData(rolesData, tacticalNote, formation);
+    showToast(ok ? "Formacion guardada correctamente" : "Guardado localmente (sin conexion)", ok ? "success" : "info");
+    setSavingTactics(false);
+  };
+
+  /** Exporta el campo tactico como imagen PNG usando html2canvas */
+  const handleExportPDF = async () => {
+    if (exportingPDF) return;
+    setExportingPDF(true);
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const target = document.getElementById("tactical-field-capture");
+      if (!target) { showToast("No se encontro el campo para exportar", "error"); setExportingPDF(false); return; }
+      const canvas = await html2canvas(target, { backgroundColor: "#0a1f08", scale: 2, useCORS: true });
+      const link = document.createElement("a");
+      link.download = `formacion-${formation}-${new Date().toISOString().slice(0,10)}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+      showToast("Imagen exportada correctamente", "success");
+    } catch (err) {
+      showToast("Error al exportar — intenta de nuevo", "error");
+    }
+    setExportingPDF(false);
+  };
 
   const starters   = athletes.filter(a => a.available).slice(0, 11);
   const bench      = athletes.filter((_, i) => i >= 11).slice(0, 7);
@@ -456,14 +935,40 @@ function TacticalBoardView({ athletes }) {
       </div>
 
       {/* ── CAMPO TÁCTICO ─────────────────────── */}
-      <div style={{ display:"flex", flexDirection:"column", minHeight:0 }}>
+      <div id="tactical-field-capture" style={{ display:"flex", flexDirection:"column", minHeight:0 }}>
         <div style={{ padding:"8px 14px", background:"rgba(0,0,0,0.7)", borderBottom:`1px solid ${PALETTE.border}`, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
           <div style={{ fontSize:10, textTransform:"uppercase", letterSpacing:"2px", color: PALETTE.textMuted }}>
             Formación {formation}
           </div>
           <div style={{ display:"flex", gap:8 }}>
-            <div style={{ fontSize:9, padding:"4px 12px", background:"transparent", border:`1px solid rgba(255,255,255,0.15)`, color: PALETTE.textMuted, cursor:"pointer", textTransform:"uppercase", letterSpacing:"1px" }}>Guardar</div>
-            <div style={{ fontSize:9, padding:"4px 12px", background: PALETTE.neon, color:"#0a0a0a", cursor:"pointer", textTransform:"uppercase", letterSpacing:"1px", fontWeight:700 }}>Usar en partido →</div>
+            <motion.div
+              onClick={handleSaveFormation}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              style={{
+                fontSize: 9, padding: "4px 12px",
+                background: "transparent",
+                border: `1px solid rgba(255,255,255,0.18)`,
+                color: savingTactics ? PALETTE.neon : PALETTE.textMuted,
+                cursor: "pointer", textTransform: "uppercase", letterSpacing: "1px",
+                display: "flex", alignItems: "center", gap: 5,
+              }}
+            >
+              {savingTactics ? "Guardando..." : "Guardar"}
+            </motion.div>
+            <motion.div
+              onClick={() => showToast("Modulo 'Usar en partido' — Proximo en V9", "info")}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              style={{
+                fontSize: 9, padding: "4px 12px",
+                background: PALETTE.neon, color: "#0a0a0a",
+                cursor: "pointer", textTransform: "uppercase",
+                letterSpacing: "1px", fontWeight: 700,
+              }}
+            >
+              Usar en partido →
+            </motion.div>
           </div>
         </div>
 
@@ -615,12 +1120,47 @@ function TacticalBoardView({ athletes }) {
 
         {/* Acciones del campo */}
         <div style={{ padding:"12px 16px", borderTop:`1px solid ${PALETTE.border}`, display:"flex", flexDirection:"column", gap:6 }}>
-          <div style={{ padding:8, background: PALETTE.neon, color:"#0a0a0a", fontSize:10, fontWeight:700, textTransform:"uppercase", letterSpacing:"1px", cursor:"pointer", textAlign:"center" }}>
-            Guardar formación
-          </div>
-          <div style={{ padding:8, background:"transparent", border:`1px solid rgba(255,255,255,0.15)`, color: PALETTE.textMuted, fontSize:10, textTransform:"uppercase", letterSpacing:"1px", cursor:"pointer", textAlign:"center" }}>
-            Exportar PDF
-          </div>
+          <motion.div
+            onClick={handleSaveFormation}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            style={{
+              padding: 8, borderRadius: 3,
+              background: savingTactics ? `${PALETTE.neon}60` : PALETTE.neon,
+              color: "#0a0a0a", fontSize: 10, fontWeight: 700,
+              textTransform: "uppercase", letterSpacing: "1px",
+              cursor: savingTactics ? "not-allowed" : "pointer", textAlign: "center",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+            }}
+          >
+            {savingTactics ? (
+              <>
+                <div style={{ width: 10, height: 10, border: "2px solid #0a0a0a", borderTop: "2px solid transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                Guardando...
+              </>
+            ) : "Guardar formacion"}
+          </motion.div>
+          <motion.div
+            onClick={handleExportPDF}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            style={{
+              padding: 8, borderRadius: 3,
+              background: "transparent",
+              border: `1px solid rgba(255,255,255,0.15)`,
+              color: exportingPDF ? PALETTE.neon : PALETTE.textMuted,
+              fontSize: 10, textTransform: "uppercase", letterSpacing: "1px",
+              cursor: exportingPDF ? "not-allowed" : "pointer", textAlign: "center",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+            }}
+          >
+            {exportingPDF ? (
+              <>
+                <div style={{ width: 10, height: 10, border: `2px solid ${PALETTE.neon}`, borderTop: "2px solid transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                Exportando...
+              </>
+            ) : "Exportar imagen"}
+          </motion.div>
         </div>
       </div>
     </div>
@@ -641,6 +1181,16 @@ export default function GestionPlantilla({ athletes, setAthletes, historial = []
     setAthletes(prev =>
       prev.map(a => a.id === updatedAthlete.id ? { ...a, ...updatedAthlete } : a)
     );
+  };
+
+  /** Agrega un deportista individual al plantel */
+  const handleAddAthlete = (newAthlete) => {
+    setAthletes(prev => [...prev, newAthlete]);
+  };
+
+  /** Agrega multiples deportistas (carga masiva CSV) */
+  const handleAddBulk = (newAthletes) => {
+    setAthletes(prev => [...prev, ...newAthletes]);
   };
 
   const tabs = [
@@ -686,6 +1236,8 @@ export default function GestionPlantilla({ athletes, setAthletes, historial = []
           <PlayerListView
             athletes={athletes}
             onUpdateAthlete={handleUpdateAthlete}
+            onAddAthlete={handleAddAthlete}
+            onAddBulk={handleAddBulk}
           />
         )}
         {activeTab === "pizarra" && (

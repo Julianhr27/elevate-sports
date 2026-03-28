@@ -10,7 +10,7 @@
 
 import { useState } from "react";
 import { PALETTE } from "../constants/palette";
-import { sanitizeText, sanitizeEmail, sanitizePhone } from "../utils/sanitize";
+import { sanitizeText, sanitizeTextFinal, sanitizeEmail, sanitizePhone } from "../utils/sanitize";
 import { ROLES } from "../constants/roles";
 import { isSupabaseReady } from "../lib/supabase";
 
@@ -67,14 +67,14 @@ export default function LandingPage({ onDemo, onRegister, onLogin }) {
     setErrors(errs);
     if (Object.keys(errs).length === 0) {
       setLoading(true);
-      // Sanitizar todos los campos antes de enviar
+      // Sanitizar y hacer trim final solo en el momento de persistencia
       await onRegister({
         ...form,
-        nombre:     sanitizeText(form.nombre),
-        ciudad:     sanitizeText(form.ciudad),
-        entrenador: sanitizeText(form.entrenador),
-        categorias: sanitizeText(form.categorias),
-        campo:      sanitizeText(form.campo),
+        nombre:     sanitizeTextFinal(form.nombre),
+        ciudad:     sanitizeTextFinal(form.ciudad),
+        entrenador: sanitizeTextFinal(form.entrenador),
+        categorias: sanitizeTextFinal(form.categorias),
+        campo:      sanitizeTextFinal(form.campo),
         telefono:   sanitizePhone(form.telefono),
         email:      cleanEmail,
         password:   form.password,
@@ -120,12 +120,16 @@ export default function LandingPage({ onDemo, onRegister, onLogin }) {
       maxWidth: 700, width: "100%", animation: "ldg_fade 1s ease-out",
     },
     card: (hover, accent) => ({
-      padding: "40px 32px", background: hover ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.6)",
+      padding: "40px 32px",
+      background: hover ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.03)",
+      backdropFilter: "blur(16px)",
+      WebkitBackdropFilter: "blur(16px)",
       border: `1px solid ${hover ? accent : "rgba(255,255,255,0.08)"}`,
       borderTop: `4px solid ${accent}`,
+      borderRadius: 12,
       cursor: "pointer", transition: "all 0.25s ease",
       transform: hover ? "translateY(-4px)" : "translateY(0)",
-      boxShadow: hover ? `0 8px 40px ${accent}33` : "none",
+      boxShadow: hover ? `0 8px 40px ${accent}33, 0 8px 32px rgba(0,0,0,0.4)` : "0 8px 32px rgba(0,0,0,0.4)",
     }),
     cardTag: (color) => ({
       fontSize: 9, textTransform: "uppercase", letterSpacing: "3px",
@@ -146,6 +150,9 @@ export default function LandingPage({ onDemo, onRegister, onLogin }) {
     // Register form styles
     formContainer: {
       maxWidth: 560, width: "100%", animation: "ldg_fade 0.5s ease-out",
+      background: "rgba(255,255,255,0.03)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
+      border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 32,
+      boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
     },
     formTitle: {
       fontSize: 28, fontWeight: 900, color: "white", textTransform: "uppercase",
@@ -164,6 +171,7 @@ export default function LandingPage({ onDemo, onRegister, onLogin }) {
       width: "100%", fontSize: 14, padding: "10px 14px",
       background: "rgba(255,255,255,0.05)",
       border: `1px solid ${hasError ? PALETTE.danger : "rgba(255,255,255,0.1)"}`,
+      borderRadius: 6,
       color: "white", fontFamily: "inherit", outline: "none",
       transition: "border-color 0.2s",
     }),

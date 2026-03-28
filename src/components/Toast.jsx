@@ -37,7 +37,7 @@ export default function ToastContainer() {
   return (
     <div style={{ position:"fixed", top:12, right:12, zIndex:99999, display:"flex", flexDirection:"column", gap:8, pointerEvents:"none" }}>
       {toasts.map(t => (
-        <div key={t.id} style={{
+        <div key={t.id} role="alert" aria-live="assertive" style={{
           padding:"10px 20px", background:"rgba(10,16,32,0.95)",
           borderLeft:`3px solid ${colors[t.type] || C.neon}`,
           border:`1px solid ${colors[t.type] || C.neon}33`,

@@ -9,11 +9,32 @@
  */
 
 import { useState } from "react";
-import { AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { PALETTE } from "../constants/palette";
 import { createMovimiento, validatePago } from "../constants/schemas";
 import { showToast } from "./Toast";
 import ConfirmModal from "./ConfirmModal";
+
+// ── Animation variants ──────────────────────────────────────────────────────
+const kpiStagger = {
+  animate: { transition: { staggerChildren: 0.07 } },
+};
+const kpiItem = {
+  initial: { opacity: 0, y: 14 },
+  animate: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 320, damping: 26 } },
+};
+const tabPanel = {
+  initial: { opacity: 0, y: 10 },
+  animate: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 28 } },
+  exit:    { opacity: 0, y: -6, transition: { duration: 0.15 } },
+};
+const rowVariant = {
+  initial: { opacity: 0, x: -8 },
+  animate: (i) => ({
+    opacity: 1, x: 0,
+    transition: { type: "spring", stiffness: 320, damping: 28, delay: i * 0.04 },
+  }),
+};
 
 const ADMIN = PALETTE.purple; // #7F77DD
 const ADMIN_DIM = "rgba(127,119,221,0.12)";
@@ -150,17 +171,21 @@ export default function Administracion({ athletes, finanzas, setFinanzas }) {
       cursor: "pointer",
       transition: "color 0.15s, background 0.15s",
     }),
-    kpiBar: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 0, marginBottom: 16 },
+    kpiBar: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 8, marginBottom: 16 },
     kpi: (color, i) => ({
       padding: "12px 18px",
-      background: "rgba(0,0,0,0.65)",
+      background: "rgba(255,255,255,0.03)",
+      backdropFilter: "blur(16px)",
+      WebkitBackdropFilter: "blur(16px)",
       borderTop: `3px solid ${color}`,
-      borderRight: i < 3 ? `1px solid ${PALETTE.border}` : "none",
+      border: `1px solid ${PALETTE.border}`,
+      borderRadius: 12,
+      boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
     }),
     kpiVal: (color) => ({ fontSize: 22, fontWeight: 700, color, lineHeight: 1 }),
     kpiLabel: { fontSize: 9, textTransform: "uppercase", letterSpacing: "1px", color: PALETTE.textMuted, marginTop: 4 },
     table: { width: "100%", borderCollapse: "collapse" },
-    th: { fontSize: 9, textTransform: "uppercase", letterSpacing: "1.5px", color: PALETTE.textMuted, padding: "8px 12px", textAlign: "left", borderBottom: `1px solid ${PALETTE.border}`, background: "rgba(0,0,0,0.5)" },
+    th: { fontSize: 9, textTransform: "uppercase", letterSpacing: "1.5px", color: PALETTE.textMuted, padding: "8px 12px", textAlign: "left", borderBottom: `1px solid ${PALETTE.border}`, background: "rgba(0,0,0,0.6)" },
     td: { fontSize: 12, color: PALETTE.text, padding: "8px 12px", borderBottom: `1px solid ${PALETTE.border}` },
     badge: (estado) => ({
       display: "inline-block",
@@ -184,7 +209,7 @@ export default function Administracion({ athletes, finanzas, setFinanzas }) {
       border: `1px solid ${ADMIN_BORDER}`,
       cursor: "pointer",
     },
-    panel: { background: "rgba(0,0,0,0.65)", border: `1px solid ${PALETTE.border}`, padding: 16, marginBottom: 12 },
+    panel: { background: "rgba(255,255,255,0.03)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", border: `1px solid ${PALETTE.border}`, borderRadius: 12, padding: 16, marginBottom: 12, boxShadow: "0 8px 32px rgba(0,0,0,0.4)" },
     panelTitle: { fontSize: 9, textTransform: "uppercase", letterSpacing: "2px", color: PALETTE.textMuted, marginBottom: 14 },
     input: { width: "100%", fontSize: 13, border: `1px solid ${PALETTE.border}`, padding: "8px 10px", background: "rgba(255,255,255,0.05)", color: "white", fontFamily: "inherit", outline: "none" },
     select: { fontSize: 13, border: `1px solid ${PALETTE.border}`, padding: "8px 10px", background: "rgba(255,255,255,0.05)", color: "white", fontFamily: "inherit", outline: "none" },
@@ -201,11 +226,13 @@ export default function Administracion({ athletes, finanzas, setFinanzas }) {
     },
     card: (color) => ({
       padding: "20px 24px",
-      background: "rgba(0,0,0,0.65)",
+      background: "rgba(255,255,255,0.03)",
+      backdropFilter: "blur(16px)",
+      WebkitBackdropFilter: "blur(16px)",
       borderTop: `3px solid ${color}`,
-      borderLeft: `1px solid ${PALETTE.border}`,
-      borderRight: `1px solid ${PALETTE.border}`,
-      borderBottom: `1px solid ${PALETTE.border}`,
+      border: `1px solid ${PALETTE.border}`,
+      borderRadius: 12,
+      boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
     }),
     mesSelect: { fontSize: 11, border: `1px solid ${ADMIN_BORDER}`, padding: "4px 8px", background: "rgba(0,0,0,0.5)", color: ADMIN, fontFamily: "inherit", outline: "none", marginLeft: 12 },
   };
@@ -234,31 +261,34 @@ export default function Administracion({ athletes, finanzas, setFinanzas }) {
       </div>
 
       {/* ═══════════════════════════════════════════ */}
-      {/* TAB: PAGOS                                  */}
+      {/* TAB PANELS — AnimatePresence for transitions */}
       {/* ═══════════════════════════════════════════ */}
+      <AnimatePresence mode="wait">
+
+      {/* TAB: PAGOS */}
       {activeTab === "Pagos" && (
-        <>
-          {/* KPI BAR */}
-          <div style={css.kpiBar}>
-            <div style={css.kpi(PALETTE.green, 0)}>
+        <motion.div key="tab-pagos" variants={tabPanel} initial="initial" animate="animate" exit="exit">
+          {/* KPI BAR — staggered entry */}
+          <motion.div variants={kpiStagger} initial="initial" animate="animate" style={css.kpiBar}>
+            <motion.div variants={kpiItem} style={css.kpi(PALETTE.green, 0)}>
               <div style={css.kpiVal(PALETTE.green)}>{fmtCOP(totalRecaudado)}</div>
               <div style={css.kpiLabel}>TOTAL RECAUDADO</div>
-            </div>
-            <div style={css.kpi(PALETTE.danger, 1)}>
+            </motion.div>
+            <motion.div variants={kpiItem} style={css.kpi(PALETTE.danger, 1)}>
               <div style={css.kpiVal(PALETTE.danger)}>{fmtCOP(totalPendiente)}</div>
               <div style={css.kpiLabel}>PENDIENTE</div>
-            </div>
-            <div style={css.kpi(ADMIN, 2)}>
+            </motion.div>
+            <motion.div variants={kpiItem} style={css.kpi(ADMIN, 2)}>
               <div style={css.kpiVal(ADMIN)}>{pctCobro}%</div>
               <div style={css.kpiLabel}>% COBRO</div>
-            </div>
-            <div style={css.kpi(PALETTE.text, 3)}>
+            </motion.div>
+            <motion.div variants={kpiItem} style={css.kpi(PALETTE.text, 3)}>
               <div style={css.kpiVal(PALETTE.text)}>{alDia}/{athletes.length}</div>
               <div style={css.kpiLabel}>JUGADORES AL DIA</div>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
 
-          {/* TABLE */}
+          {/* TABLE with animated rows */}
           <div style={{ overflowX: "auto" }}>
             <table style={css.table}>
               <thead>
@@ -278,7 +308,14 @@ export default function Administracion({ athletes, finanzas, setFinanzas }) {
                   const estado = pago ? pago.estado : "pendiente";
                   const fechaPago = pago ? pago.fechaPago : null;
                   return (
-                    <tr key={a.id} style={{ background: i % 2 === 0 ? "rgba(0,0,0,0.35)" : "rgba(0,0,0,0.2)" }}>
+                    <motion.tr
+                      key={a.id}
+                      custom={i}
+                      variants={rowVariant}
+                      initial="initial"
+                      animate="animate"
+                      style={{ background: i % 2 === 0 ? "rgba(0,0,0,0.35)" : "rgba(0,0,0,0.2)" }}
+                    >
                       <td style={css.td}>{a.id}</td>
                       <td style={{ ...css.td, fontWeight: 700 }}>{a.name}</td>
                       <td style={{ ...css.td, fontSize: 10, textTransform: "uppercase", letterSpacing: "1px", color: PALETTE.textMuted }}>{a.pos}</td>
@@ -290,20 +327,18 @@ export default function Administracion({ athletes, finanzas, setFinanzas }) {
                           CAMBIAR
                         </button>
                       </td>
-                    </tr>
+                    </motion.tr>
                   );
                 })}
               </tbody>
             </table>
           </div>
-        </>
+        </motion.div>
       )}
 
-      {/* ═══════════════════════════════════════════ */}
-      {/* TAB: MOVIMIENTOS                            */}
-      {/* ═══════════════════════════════════════════ */}
+      {/* TAB: MOVIMIENTOS */}
       {activeTab === "Movimientos" && (
-        <>
+        <motion.div key="tab-movimientos" variants={tabPanel} initial="initial" animate="animate" exit="exit">
           {/* BALANCE */}
           <div style={{ ...css.panel, borderTop: `3px solid ${ADMIN}` }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -354,17 +389,24 @@ export default function Administracion({ athletes, finanzas, setFinanzas }) {
             {movimientos.length === 0 && (
               <div style={{ color: PALETTE.textMuted, fontSize: 12, padding: "12px 0" }}>Sin movimientos registrados.</div>
             )}
-            {[...movimientos].reverse().map(m => (
-              <div key={m.id} style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "10px 12px",
-                borderBottom: `1px solid ${PALETTE.border}`,
-                borderLeft: `3px solid ${m.tipo === "ingreso" ? PALETTE.green : PALETTE.danger}`,
-                marginBottom: 4,
-                background: m.tipo === "ingreso" ? "rgba(29,158,117,0.06)" : "rgba(226,75,74,0.06)",
-              }}>
+            {[...movimientos].reverse().map((m, i) => (
+              <motion.div
+                key={m.id}
+                custom={i}
+                variants={rowVariant}
+                initial="initial"
+                animate="animate"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "10px 12px",
+                  borderBottom: `1px solid ${PALETTE.border}`,
+                  borderLeft: `3px solid ${m.tipo === "ingreso" ? PALETTE.green : PALETTE.danger}`,
+                  marginBottom: 4,
+                  background: m.tipo === "ingreso" ? "rgba(29,158,117,0.06)" : "rgba(226,75,74,0.06)",
+                }}
+              >
                 <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                   <span style={{
                     fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px",
@@ -384,35 +426,42 @@ export default function Administracion({ athletes, finanzas, setFinanzas }) {
                     {m.tipo === "ingreso" ? "+" : "-"}{fmtCOP(m.monto)}
                   </span>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
-        </>
+        </motion.div>
       )}
 
-      {/* ═══════════════════════════════════════════ */}
-      {/* TAB: RESUMEN                                */}
-      {/* ═══════════════════════════════════════════ */}
+      {/* TAB: RESUMEN */}
       {activeTab === "Resumen" && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 12 }}>
-          <div style={css.card(ADMIN)}>
-            <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "2px", color: PALETTE.textMuted, marginBottom: 8 }}>BALANCE TOTAL</div>
-            <div style={{ fontSize: 34, fontWeight: 700, color: balanceTotal >= 0 ? PALETTE.green : PALETTE.danger }}>{fmtCOP(balanceTotal)}</div>
-          </div>
-          <div style={css.card(PALETTE.green)}>
-            <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "2px", color: PALETTE.textMuted, marginBottom: 8 }}>RECAUDO DEL MES</div>
-            <div style={{ fontSize: 34, fontWeight: 700, color: PALETTE.green }}>{fmtCOP(totalRecaudado + totalParcial)}</div>
-          </div>
-          <div style={css.card(PALETTE.danger)}>
-            <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "2px", color: PALETTE.textMuted, marginBottom: 8 }}>GASTOS DEL MES</div>
-            <div style={{ fontSize: 34, fontWeight: 700, color: PALETTE.danger }}>{fmtCOP(egresosMes)}</div>
-          </div>
-          <div style={css.card(PALETTE.amber)}>
-            <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "2px", color: PALETTE.textMuted, marginBottom: 8 }}>TASA DE MOROSIDAD</div>
-            <div style={{ fontSize: 34, fontWeight: 700, color: PALETTE.amber }}>{tasaMorosidad}%</div>
-          </div>
-        </div>
+        <motion.div key="tab-resumen" variants={tabPanel} initial="initial" animate="animate" exit="exit">
+          <motion.div
+            variants={kpiStagger}
+            initial="initial"
+            animate="animate"
+            style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 12 }}
+          >
+            <motion.div variants={kpiItem} style={css.card(ADMIN)}>
+              <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "2px", color: PALETTE.textMuted, marginBottom: 8 }}>BALANCE TOTAL</div>
+              <div style={{ fontSize: 34, fontWeight: 700, color: balanceTotal >= 0 ? PALETTE.green : PALETTE.danger }}>{fmtCOP(balanceTotal)}</div>
+            </motion.div>
+            <motion.div variants={kpiItem} style={css.card(PALETTE.green)}>
+              <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "2px", color: PALETTE.textMuted, marginBottom: 8 }}>RECAUDO DEL MES</div>
+              <div style={{ fontSize: 34, fontWeight: 700, color: PALETTE.green }}>{fmtCOP(totalRecaudado + totalParcial)}</div>
+            </motion.div>
+            <motion.div variants={kpiItem} style={css.card(PALETTE.danger)}>
+              <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "2px", color: PALETTE.textMuted, marginBottom: 8 }}>GASTOS DEL MES</div>
+              <div style={{ fontSize: 34, fontWeight: 700, color: PALETTE.danger }}>{fmtCOP(egresosMes)}</div>
+            </motion.div>
+            <motion.div variants={kpiItem} style={css.card(PALETTE.amber)}>
+              <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "2px", color: PALETTE.textMuted, marginBottom: 8 }}>TASA DE MOROSIDAD</div>
+              <div style={{ fontSize: 34, fontWeight: 700, color: PALETTE.amber }}>{tasaMorosidad}%</div>
+            </motion.div>
+          </motion.div>
+        </motion.div>
       )}
+
+      </AnimatePresence>
 
       {/* Modal de confirmacion */}
       <AnimatePresence>

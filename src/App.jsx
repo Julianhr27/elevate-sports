@@ -12,6 +12,7 @@
  */
 
 import { useState, useCallback, useEffect, lazy, Suspense } from "react";
+import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import useLocalStorage, { setHookErrorHandler } from "./hooks/useLocalStorage";
 import FieldBackground from "./components/FieldBackground";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -33,6 +34,12 @@ import { exportBackupJSON } from "./services/backupService";
 import { signUp, signIn, signOut as authSignOut, getProfile, onAuthStateChange, setAuthErrorHandler, linkProfileToClub } from "./services/authService";
 
 // ── React.lazy: code-splitting por modulo ──
+const PortalLayout = lazy(() => import("./components/portal/PortalLayout"));
+const PortalHome = lazy(() => import("./components/portal/PortalHome"));
+const SportsCRMPage = lazy(() => import("./components/portal/SportsCRMPage"));
+const JournalPage = lazy(() => import("./components/portal/JournalPage"));
+const QuienesSomos = lazy(() => import("./components/portal/QuienesSomos"));
+const Contacto = lazy(() => import("./components/portal/Contacto"));
 const CommercialLanding = lazy(() => import("./components/CommercialLanding"));
 const LandingPage = lazy(() => import("./components/LandingPage"));
 const Home = lazy(() => import("./components/Home"));
@@ -52,9 +59,7 @@ setAuthErrorHandler(_toastError);
 
 // ── Ejecutar migraciones al boot ──
 const migrationResult = runMigrations();
-if (migrationResult.migrated) {
-  console.info(`[migrations] ${migrationResult.steps} migration(s): ${migrationResult.from} → ${migrationResult.to}`);
-}
+// Migration result tracked internally — no console output in production
 
 // ── Loading fallback ──
 const LoadingFallback = () => (
@@ -69,11 +74,33 @@ const LoadingFallback = () => (
 
 const DEFAULT_CLUB = { nombre:"", disciplina:"", ciudad:"", entrenador:"", temporada:"", categorias:[], campos:[], descripcion:"", telefono:"", email:"" };
 
+// ── Root: BrowserRouter wrapper ──
 export default function App() {
+  return (
+    <BrowserRouter>
+      <ToastContainer />
+      <Routes>
+        {/* Portal Corporativo — rutas con navbar compartida */}
+        <Route element={<Suspense fallback={<LoadingFallback />}><PortalLayout /></Suspense>}>
+          <Route index element={<PortalHome />} />
+          <Route path="quienes-somos" element={<QuienesSomos />} />
+          <Route path="contacto" element={<Contacto />} />
+          <Route path="servicios/sports-crm" element={<SportsCRMPage />} />
+          <Route path="journal" element={<JournalPage />} />
+        </Route>
+        {/* CRM App — sistema de gestion deportiva */}
+        <Route path="/crm/*" element={<CRMApp />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+// ── CRM App: todo el sistema de gestion deportiva ──
+function CRMApp() {
+  const navigate = useNavigate();
   const [mode, setMode] = useLocalStorage("elevate_mode", null);
   const [session, setSession] = useLocalStorage(SESSION_KEY, null);
   const [activeModule, setActiveModule] = useState("home");
-  const [landingStep, setLandingStep] = useState("commercial"); // commercial | register
   const [athletes, setAthletes] = useLocalStorage("elevate_athletes", EMPTY_ATHLETES);
   const [historial, setHistorial] = useLocalStorage("elevate_historial", EMPTY_HISTORIAL);
   const [clubInfo, setClubInfo] = useLocalStorage("elevate_clubInfo", DEFAULT_CLUB);
@@ -236,20 +263,26 @@ export default function App() {
     setFinanzas(EMPTY_FINANZAS);
     setActiveModule("home");
     setMode(null);
-  }, [setAthletes, setHistorial, setClubInfo, setMatchStats, setFinanzas, setMode, setSession]);
+    navigate("/");
+  }, [setAthletes, setHistorial, setClubInfo, setMatchStats, setFinanzas, setMode, setSession, navigate]);
 
-  // ── Landing: Commercial → Register flow ──
+  // Auto-demo: si llegan desde el portal con ?demo=true
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("demo") === "true" && !mode) {
+      handleDemo();
+      window.history.replaceState({}, "", "/crm");
+    }
+  }, []);
+
+  // ── Landing: directo al formulario de login/registro ──
   if (!mode) {
     return (
       <div style={{ minHeight:"100vh", background:"#050a14", position:"relative" }}>
-        {landingStep === "register" && <FieldBackground />}
+        <FieldBackground />
         <ToastContainer />
         <Suspense fallback={<LoadingFallback />}>
-          {landingStep === "commercial" ? (
-            <CommercialLanding onDemo={handleDemo} onRegister={() => setLandingStep("register")} />
-          ) : (
-            <LandingPage onDemo={handleDemo} onRegister={handleRegister} onLogin={handleLogin} />
-          )}
+          <LandingPage onDemo={handleDemo} onRegister={handleRegister} onLogin={handleLogin} />
         </Suspense>
       </div>
     );
@@ -274,9 +307,9 @@ export default function App() {
   const clubProps = { ...clubInfo, categoria: (clubInfo.categorias || [])[0] || "General" };
 
   const MiniTopbar = ({ title, accent = C.neon, accentBg = "rgba(200,255,0,0.05)" }) => (
-    <div style={{ height:38, background:"rgba(0,0,0,0.92)", borderBottom:`1px solid ${accent}33`, display:"flex", alignItems:"stretch" }}>
-      <div onClick={() => setActiveModule("home")} style={{ padding:"0 18px", fontSize:10, textTransform:"uppercase", letterSpacing:"2px", color:C.textMuted, display:"flex", alignItems:"center", cursor:"pointer", borderRight:`1px solid ${C.border}` }}>
-        ← Inicio
+    <div style={{ height:38, background:"rgba(10,10,15,0.85)", backdropFilter:"blur(20px)", WebkitBackdropFilter:"blur(20px)", borderBottom:`1px solid ${accent}33`, display:"flex", alignItems:"stretch" }}>
+      <div onClick={() => navigate("/")} style={{ padding:"0 18px", fontSize:10, textTransform:"uppercase", letterSpacing:"2px", color:C.textMuted, display:"flex", alignItems:"center", cursor:"pointer", borderRight:`1px solid ${C.border}` }}>
+        ← Portal
       </div>
       <div style={{ padding:"0 18px", fontSize:10, textTransform:"uppercase", letterSpacing:"2px", color:"white", display:"flex", alignItems:"center", borderBottom:`2px solid ${accent}`, background:accentBg }}>
         {title}

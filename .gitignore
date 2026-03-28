@@ -35,3 +35,11 @@ supabase/config.toml
 
 # Tools (visualizer, etc.)
 tools/
+
+# Python virtual environments
+.venv/
+venv/
+
+# Artifacts de trabajo (no versionar)
+mockup-landing.html
+skills-lock.json
