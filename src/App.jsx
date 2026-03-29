@@ -51,6 +51,7 @@ const GestionPlantilla = lazy(() => import("./components/GestionPlantilla"));
 const MiClub = lazy(() => import("./components/MiClub"));
 const Administracion = lazy(() => import("./components/Administracion"));
 const Calendario     = lazy(() => import("./components/Calendario"));
+const MatchCenter    = lazy(() => import("./components/MatchCenter"));
 
 // ── Conectar handlers de error de storage al boot (antes de que cualquier hook escriba) ──
 const _toastError = (msg) => showToast(msg, "error");
@@ -394,6 +395,13 @@ function CRMApp() {
             <ErrorBoundary>
               <MiniTopbar title="Calendario" accent={C.neon} accentBg="rgba(200,255,0,0.05)" />
               <Calendario athletes={athletes} clubId={authProfile?.club_id || ""} />
+            </ErrorBoundary>
+          )}
+
+          {activeModule === "partidos" && (
+            <ErrorBoundary>
+              <MiniTopbar title="Match Center" accent={C.neon} accentBg="rgba(200,255,0,0.05)" />
+              <MatchCenter athletes={athletes} historial={historial} clubId={authProfile?.club_id || ""} />
             </ErrorBoundary>
           )}
 
