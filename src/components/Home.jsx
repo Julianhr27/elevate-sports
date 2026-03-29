@@ -564,14 +564,59 @@ export default function Home({ club, athletes, stats, matchStats, onNavigate, mo
           )}
         </InteractiveTile>
 
-        {/* TILE 6 — CALENDARIO (fila 3, ancho completo) */}
+        {/* TILE 6 — MATCH CENTER */}
+        <div
+          onClick={() => onNavigate("partidos")}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = PALETTE.neon; playHover(); }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(200,255,0,0.15)"; }}
+          style={{
+            position:"relative", overflow:"hidden",
+            gridColumn:"1/4", gridRow:"3",
+            borderTop:`2px solid rgba(200,255,0,0.35)`,
+            border:`1px solid rgba(200,255,0,0.15)`,
+            background:"linear-gradient(135deg,rgba(127,119,221,0.06),rgba(10,10,18,0.96))",
+            cursor:"pointer",
+            minHeight:64,
+            display:"flex", alignItems:"center", justifyContent:"space-between",
+            padding:"0 24px",
+            transition:"border-color 200ms",
+            boxShadow:"0 4px 24px rgba(0,0,0,0.4)",
+          }}
+        >
+          <div style={{ display:"flex", alignItems:"center", gap:16 }}>
+            <div style={{ width:36, height:36, border:`1px solid rgba(127,119,221,0.35)`, display:"flex", alignItems:"center", justifyContent:"center", background:"rgba(127,119,221,0.08)" }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke={PALETTE.purple} strokeWidth="1.5"/>
+                <path d="M12 2a10 10 0 0 1 0 20M2 12h20M12 2c-2.5 3-4 6.5-4 10s1.5 7 4 10M12 2c2.5 3 4 6.5 4 10s-1.5 7-4 10" stroke={PALETTE.purple} strokeWidth="1.2"/>
+              </svg>
+            </div>
+            <div>
+              <div style={{ fontSize:8, textTransform:"uppercase", letterSpacing:"2px", color:"rgba(127,119,221,0.7)", marginBottom:3 }}>Modulo 07</div>
+              <div style={{ fontSize:14, fontWeight:900, color:PALETTE.text, textTransform:"uppercase", letterSpacing:"-0.3px" }}>
+                Match Center
+              </div>
+            </div>
+          </div>
+          <div style={{ display:"flex", alignItems:"center", gap:24 }}>
+            <div style={{ textAlign:"right" }}>
+              <div style={{ fontSize:9, color:PALETTE.textMuted, textTransform:"uppercase", letterSpacing:"0.5px" }}>
+                Reportes · Player Cards · Analytics
+              </div>
+            </div>
+            <div style={{ fontSize:9, fontWeight:700, textTransform:"uppercase", letterSpacing:"1.5px", padding:"7px 16px", border:`1px solid rgba(127,119,221,0.4)`, color:PALETTE.purple }}>
+              Abrir →
+            </div>
+          </div>
+        </div>
+
+        {/* TILE 7 — CALENDARIO (fila 4, ancho completo) */}
         <div
           onClick={() => onNavigate("calendario")}
           onMouseEnter={e => { e.currentTarget.style.borderColor = PALETTE.neon; playHover(); }}
           onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(200,255,0,0.15)"; }}
           style={{
             position:"relative", overflow:"hidden",
-            gridColumn:"1/4", gridRow:"3",
+            gridColumn:"1/4", gridRow:"4",
             borderTop:`2px solid rgba(200,255,0,0.35)`,
             border:`1px solid rgba(200,255,0,0.15)`,
             background:"linear-gradient(135deg,rgba(200,255,0,0.04),rgba(10,10,18,0.96))",

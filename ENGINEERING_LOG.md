@@ -6,6 +6,147 @@
 
 ---
 
+## 2026-03-28 — Match Center Ingest + Performance Analytics Engine
+**Directiva de**: Julian
+**Status**: 🟢 Completo — pendiente QA @Sara
+
+### Plan
+
+Modulo Match Center con tres secciones:
+- **Seccion A — Ingesta post-partido**: Formulario por jugador con steppers tipo FIFA (sin input manual). Persistencia en localStorage con namespace `elevate_matchreports_{clubId}`.
+- **Seccion B — Player Card Pro**: Card estilo Ultimate Team con OVR, Elevate Score, stats del partido, fatiga RPE semaforo, alerta "Rendimiento en Riesgo".
+- **Seccion C — Analytics Dashboard**: Spider chart SVG propio (6 ejes), mini line chart historial, barras de correlacion (minutos/efectividad/riesgo), recomendaciones tecnicas automaticas.
+- **Elevate Score Algorithm**: Motor matematico en `src/utils/elevateScore.js`, separado del componente UI.
+
+### Task Assignment
+- **@Andres (UI)**: `MatchCenter.jsx` completo — glassmorphism, Framer Motion, steppers FIFA, cards Pro, layout sidebar/main, responsive mobile via CSS inyectado.
+- **@Mateo (Data)**: `elevateScore.js` — algoritmo Elevate Score, calcOVR, getPerformanceAlert, generateRecommendations, DEMO_MATCH_REPORTS (4 partidos con stats realistas), getAthleteScoreHistory.
+- **@Sara (QA)**: Verificar calculo de Elevate Score, alertas RPE, persistencia localStorage, responsive mobile, que el build compile sin errores.
+
+### Architecture Decisions
+
+1. **Separacion algoritmo/UI**: Todo el motor matematico vive en `src/utils/elevateScore.js`. `MatchCenter.jsx` solo consume las funciones exportadas. Facil de testear en aislamiento.
+2. **Spider Chart SVG propio**: Sin dependencias externas (recharts, d3). SVG generado en JS puro. 6 ejes: Goles, Asist, Rec, Duelos, Min, Fisico.
+3. **Steppers FIFA sin input**: `FifaStepper` con click +/- unicamente. `onMouseEnter` para hover feedback. No se expone `<input type="number">`.
+4. **Persistencia namespace**: `elevate_matchreports_{clubId}` — compatible con patron offline-first. Inicializa desde `DEMO_MATCH_REPORTS` si no hay datos guardados.
+5. **RBAC**: `view:partidos` agregado a roles `admin` y `coach` en `src/constants/roles.js`. `staff` no tiene acceso.
+6. **Lazy import**: `MatchCenter = lazy(() => import("./components/MatchCenter"))` en `App.jsx`. MiniTopbar con acento neon.
+7. **Home tile**: Modulo 07 en Home.jsx, fila 3 ancho completo, acento violet — diferenciado del tile Calendario (fila 4, acento neon).
+8. **OVR calculo**: Mapeo `[0, 10] → [50, 99]` basado en promedio de Elevate Scores historicos. 65 como fallback sin datos.
+9. **Datos demo**: 4 partidos con 9-11 jugadores cada uno, stats realistas — IDs 1-12 matching `DEMO_ATHLETES`.
+
+### Validation Criteria
+- Elevate Score calcula correctamente: goles*2 + asistencias*1.5 + recuperaciones*0.3 + duelos*0.2 + (min/90)*1 - tarjetaAmarilla*0.5 - tarjetaRoja*3, clamp [0,10].
+- Alerta "Rendimiento en Riesgo" aparece si RPE > 7.
+- Alerta "Reducir carga" aparece si RPE > 8 Y ElevateScore > 7.
+- Steppers no permiten ir debajo de 0 ni superar el max definido por campo.
+- localStorage persiste al guardar y recarga al volver al mismo partido.
+- Spider chart renderiza con 6 ejes, poligono de datos, anillos de referencia.
+- Mini line chart no renderiza con menos de 2 puntos — muestra "Sin historial".
+- Build: 0 errores TypeScript/ESLint.
+- Responsive: layout cambia a columna en mobile. Grids de steppers se reordenan.
+
+### Files Modified/Created
+- `src/utils/elevateScore.js` — CREADO
+- `src/components/MatchCenter.jsx` — CREADO
+- `src/constants/roles.js` — view:partidos agregado a admin y coach
+- `src/App.jsx` — lazy import + activeModule "partidos" + MiniTopbar
+- `src/components/Home.jsx` — tile Modulo 07 Match Center (fila 3), Calendario movido a fila 4
+
+### QA Report @Sara — 2026-03-28
+
+**Veredicto: CONDITIONAL GO-LIVE**
+
+#### CHECKLIST RAPIDO
+
+| Item | Status | Severidad |
+|---|---|---|
+| XSS: sin innerHTML / dangerouslySetInnerHTML / eval | PASS | — |
+| Multi-tenancy: localStorage key con clubId | PASS | — |
+| RBAC: view:partidos en admin y coach, NO en staff | PASS | — |
+| Algoritmo: calculo manual verificado | PASS (ver nota) | — |
+| Validacion steppers: limites correctos | PASS | — |
+| Performance: memo/useMemo donde corresponde | PARTIAL | MAJOR |
+| Build: compilacion limpia | NO VERIFICADO | BLOCKER pendiente |
+| Privacidad Ley 1581: aislamiento localStorage | PARTIAL | MAJOR |
+
+---
+
+#### ALGORITMO — Verificacion manual calcElevateScore
+
+Inputs: goles=2, asist=1, rec=3, duelos=5, min=90, tarjeta=ninguna
+
+```
+raw = (2 × 2.0) + (1 × 1.5) + (3 × 0.3) + (5 × 0.2) + (90/90 × 1.0) - 0
+    = 4.0 + 1.5 + 0.9 + 1.0 + 1.0
+    = 8.4
+```
+
+Resultado: **8.4** — coincide exactamente con el target documentado en el ticket. PASS.
+
+Casos extremos verificados estaticamente:
+- Stats todos en cero: raw = 0.0 -> clamped = 0.0 PASS
+- Tarjeta roja con goles altos (5 goles): raw = 10+1-3 = 8 -> PASS
+- Maximos absolutos: raw >> 10 -> clamp a 10.0 PASS
+
+---
+
+#### HALLAZGOS
+
+**[MAJOR] Dead import: calcSaludActual importado pero nunca usado**
+- Archivo: `src/components/MatchCenter.jsx`, linea 27
+- `import { calcSaludActual } from "../utils/rpeEngine"` existe pero la funcion no es llamada en ninguna parte del componente.
+- El RPE se lee directamente de `athlete.rpe` en la prop. El import es codigo muerto.
+- Impacto: tree-shaker deberia eliminarlo, pero es una señal de que la integracion RPE fue planeada y abandonada a medias. Si rpeEngine no es un modulo separado lazy-loaded, esto no bloquea pero genera confusion de mantenimiento.
+- Fix: eliminar el import. Si la intencion era cruzar RPE con historial via calcSaludActual, implementarlo o documentar el TODO.
+
+**[MAJOR] clubId fallback "default" contamina multi-tenancy**
+- Archivo: `src/components/MatchCenter.jsx`, linea 543
+- `const STORAGE_KEY = \`elevate_matchreports_\${clubId || "default"}\``
+- En modo demo (sin Supabase), `authProfile?.club_id` es null y la clave cae a `elevate_matchreports_default`. Todos los clubes en modo demo/offline comparten el mismo namespace.
+- Esto es identico al defecto que encontre en el sprint Calendario. Patron recurrente.
+- Fix: usar el mismo patron defensivo que otros modulos — si no hay clubId, usar un UUID de sesion o bloquear la escritura. No usar "default" como namespace compartido.
+
+**[MINOR] Analytics view: solo muestra 6 Player Cards (slice(0,6))**
+- Archivo: `src/components/MatchCenter.jsx`, linea 889
+- `matchAthletes.slice(0, 6)` — si un partido tiene 11 jugadores, 5 quedan sin Card Pro visible en la vista Analytics.
+- La vista Ingesta muestra a todos correctamente. La inconsistencia es confusa para el coach.
+- Fix: quitar el slice o agregar paginacion/scroll dentro del panel de cards.
+
+**[MINOR] getPerformanceAlert recibe rpe ?? 5 como default**
+- Archivo: `src/components/MatchCenter.jsx`, linea 294
+- `getPerformanceAlert(rpe ?? 5, elevateScore)` — si el jugador no tiene RPE registrado, se asume RPE=5 (Optimo). Esta suposicion silencia alertas reales de fatiga desconocida.
+- El componente `FatigaIndicator` maneja el null correctamente mostrando "Sin datos". La card deberia hacer lo mismo con getPerformanceAlert.
+- Fix: si rpe es null, no llamar getPerformanceAlert o retornar un nivel "sin datos" en lugar de suprimir silenciosamente con valor por defecto.
+
+**[INFO] Build no pudo ser ejecutado en esta sesion — requiere permiso Bash**
+- El build debe verificarse manualmente con `npm run build` antes de merge a master. El equipo debe confirmar 0 errores antes de go-live.
+
+---
+
+#### PRIVACIDAD LEY 1581
+
+- Stats de partido son datos de rendimiento de menores — clasifican como datos sensibles bajo Ley 1581 Art. 5.
+- Aislamiento por clubId: PARCIAL (ver defecto multi-tenancy "default" arriba).
+- No hay PII en URLs ni en claves de localStorage mas alla del clubId: PASS.
+- Los datos demo (DEMO_MATCH_REPORTS) contienen IDs numericos sin nombres propios en el payload: PASS.
+- No se detectan leaks de datos entre componentes via props: PASS.
+
+---
+
+#### CONDICIONES PARA GO-LIVE
+
+1. **Verificar build limpio** (`npm run build` — 0 errores, 0 warnings criticos).
+2. **Eliminar import muerto** `calcSaludActual` — riesgo de confusion en futuros refactors.
+3. **Documentar o mitigar el fallback "default"** en STORAGE_KEY — riesgo de contaminacion de datos entre sesiones demo en dispositivo compartido.
+
+Items 2 y 3 pueden resolverse en el mismo PR de merge. Item 1 es el unico bloqueo real.
+
+**@Mateo**: El algoritmo esta correcto. Los datos demo son coherentes y cubren casos de tarjeta roja, amarilla y ausencias. Aprobado ese modulo.
+**@Andres**: Sin XSS. Responsive CSS inyectado correctamente con guard `!document.getElementById`. Steppers con limites declarados en FIELD_LIMITS y aplicados en FifaStepper. Aprobado.
+
+---
+
 ## 2026-03-28 — Sprint "Command Calendar": RSVP Engine + Competition Planner
 **Directiva de**: Julián
 **Status**: QA EN CURSO — ver reporte @Sara abajo
