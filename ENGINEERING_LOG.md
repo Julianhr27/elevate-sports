@@ -6,6 +6,145 @@
 
 ---
 
+## 2026-03-28 — Sprint "Command Calendar": RSVP Engine + Competition Planner
+**Directiva de**: Julián
+**Status**: QA EN CURSO — ver reporte @Sara abajo
+
+### Plan
+
+Módulo de Calendario unificado que combina:
+- **Competition Planner**: vista mensual custom (sin FullCalendar), diferenciación visual por tipo de evento, navegación prev/next.
+- **RSVP Engine**: estados por deportista por evento (CONFIRMADO | AUSENTE | DUDA), widget de disponibilidad en tiempo real, recordatorio simulado con toast.
+- Bloqueo de entrada de RPE para inasistencia confirmada (lógica en Entrenamiento, expuesta via localStorage).
+
+### Task Assignment
+
+- **@Andres (UI)**: Componente `Calendario.jsx` completo — grid mensual glassmorphism, badges de evento por color, panel lateral de evento seleccionado, lista de deportistas + RSVP inline, widget de disponibilidad, animaciones Framer Motion, responsive mobile.
+- **@Mateo (Data)**: Datos demo generados internamente (3-4 partidos, 3-4 entrenamientos, 1-2 eventos de club para el mes actual). Estado RSVP persistido en localStorage con namespace `elevate_rsvp_{clubId}`. Helper `getRsvpKey(clubId, eventId, athleteId)`.
+- **@Sara (QA)**: Verificar que el conteo de disponibilidad sea reactivo, que el bloqueo de RPE funcione, que la navegación prev/next sea correcta y que el responsive mobile no rompa el grid.
+
+### Architecture Decisions
+
+1. **Sin FullCalendar** — bundle ligero. Grid propio 7x6 con CSS grid, generado en JS puro.
+2. **RSVP integrado** en `Calendario.jsx` como panel lateral — no archivo separado. Un solo componente lazy-loaded.
+3. **Persistencia localStorage** con namespace `elevate_rsvp_{clubId}` — compatible con el patrón offline-first existente. Estructura: `{ [eventId]: { [athleteId]: "CONFIRMADO"|"AUSENTE"|"DUDA" } }`.
+4. **Colores de evento**: Entrenamiento = `PALETTE.purple`, Partido oficial = `PALETTE.neon`, Evento de club = `PALETTE.amber`.
+5. **Módulo `calendario`** agregado al sistema RBAC — accesible para roles `admin` y `coach`. Se añade `"view:calendario"` a ambos roles en `roles.js`.
+6. **Lazy import** desde `App.jsx`, misma convención que los demás módulos.
+
+### Validation Criteria
+
+- Grid mensual renderiza correctamente para cualquier mes (primer día variable, semanas variables).
+- Evento seleccionado muestra panel con lista de deportistas y sus estados RSVP actuales.
+- Cambiar estado RSVP actualiza el widget de disponibilidad en tiempo real.
+- Botón "Enviar recordatorio" dispara `showToast` con mensaje descriptivo.
+- Navegación prev/next cambia el mes y re-renderiza el grid sin errores.
+- No hay `any` types implícitos (aunque el proyecto usa JSX, las prop shapes están documentadas via JSDoc).
+- Responsive: en mobile, el panel lateral cae debajo del grid o se colapsa.
+
+### @Sara (QA) — 2026-03-28 — REPORTE OFICIAL: Calendario + RSVP Engine
+
+**Veredicto: CONDITIONAL GO-LIVE — 2 blockers deben resolverse antes de merge a master**
+
+---
+
+#### RESUMEN EJECUTIVO
+
+El módulo Calendario.jsx es técnicamente sólido en un 80%. El build compila limpio (0 errores, 0 warnings). La arquitectura RBAC es correcta. Sin embargo, hay un contrato roto crítico entre RSVP y RPE, un riesgo de privacidad Ley 1581 en datos de menores sin namespace de club en las claves auxiliares, y un ID fallback que puede producir corrupción de datos silenciosa.
+
+---
+
+#### HALLAZGOS POR SEVERIDAD
+
+---
+
+**BUG-CAL-001 — CRITICO**
+**Categoria**: Data Integrity — RPE Block Contract Broken
+**Archivo**: `src/components/Calendario.jsx` (linea 235) + `src/components/Entrenamiento.jsx`
+**Descripcion**: El bloqueo de RPE para atletas AUSENTE esta implementado como un contrato de una sola cara. Calendario escribe `elevate_rsvp_absent_{eventId}_{athleteId}` en localStorage, pero Entrenamiento.jsx NO lee esa clave en ninguna parte. Entrenamiento determina ausencia exclusivamente via `a.status === "A"` (campo del objeto atleta). El bloqueo de RPE prometido en la arquitectura es una feature fantasma: no funciona en absoluto.
+**Pasos para reproducir**:
+1. Abrir Calendario, seleccionar un evento, marcar a un atleta como AUSENTE.
+2. Ir a Entrenamiento y registrar RPE para ese mismo atleta.
+3. El sistema acepta el RPE sin ningun bloqueo ni advertencia.
+**Esperado**: El sistema bloquea la entrada de RPE o muestra advertencia visible.
+**Actual**: El RPE se registra normalmente. La clave `elevate_rsvp_absent_*` existe en localStorage pero nadie la consume.
+**Impacto**: Datos de entrenamiento invalidos. Un atleta ausente puede tener RPE registrado, contaminando los calculos de carga y los snapshots de salud.
+**Fix requerido**: Entrenamiento debe leer `localStorage.getItem(`elevate_rsvp_absent_${eventId}_${athleteId}`)` al momento de abrir el modulo del dia, o bien el estado AUSENTE debe propagarse al campo `a.status` del atleta. El equipo debe decidir el canal canonico; actualmente hay dos y ninguno esta conectado.
+
+---
+
+**BUG-CAL-002 — MAYOR**
+**Categoria**: Data Integrity — Athlete ID Fallback
+**Archivo**: `src/components/Calendario.jsx` (lineas 419, 549, 551)
+**Descripcion**: El sistema usa `a.id || a.nombre` como identificador de atleta en todo el mapa RSVP. Si un atleta no tiene campo `id` definido, se usa `nombre` como clave. Si dos atletas tienen el mismo nombre (caso comun en equipos infantiles: dos "Juan Gonzalez"), sus estados RSVP se fusionaran silenciosamente en la misma entrada del mapa. Ademas, si el nombre tiene espacios o caracteres especiales, la clave del localStorage auxiliar `elevate_rsvp_absent_{eventId}_{nombre}` puede contener espacios, lo que es valido pero fragil y dificulta la depuracion.
+**Fix requerido**: Garantizar que todos los atletas tengan `id` UUID antes de llegar al Calendario. Agregar una guardia en el hook: si `!athlete.id`, loggear error y usar un hash del nombre+posicion como fallback, nunca el nombre crudo.
+
+---
+
+**BUG-CAL-003 — MAYOR**
+**Categoria**: Privacidad / Ley 1581 — Datos RSVP de Menores sin club_id en claves auxiliares
+**Archivo**: `src/components/Calendario.jsx` (linea 235)
+**Descripcion**: La clave maestra de RSVP SI esta correctamente namespaciada: `elevate_rsvp_{clubId}`. Sin embargo, las claves auxiliares de bloqueo de RPE NO incluyen el clubId: `elevate_rsvp_absent_{eventId}_{athleteId}`. En un dispositivo compartido entre dos coaches de clubes diferentes (escenario posible en escuelas deportivas), el estado de ausencia de un menor de Club A es legible por el Club B si adivina el formato de clave. Estos datos (asistencia de menores a eventos) califican como datos personales bajo Ley 1581 y deben estar aislados por club.
+**Fix requerido**: Cambiar la clave a `elevate_rsvp_absent_{clubId}_{eventId}_{athleteId}` e incluir `clubId` como parametro en `setRsvp`.
+
+---
+
+**BUG-CAL-004 — MENOR**
+**Categoria**: Privacidad / Ley 1581 — RSVP de menores como dato sensible
+**Archivo**: `src/components/Calendario.jsx` (hook useRsvp)
+**Descripcion**: Los estados RSVP de atletas menores de edad (asistencia a eventos deportivos) son datos personales bajo Ley 1581. Actualmente se persisten en localStorage sin ninguna anotacion de categoria del dato ni mecanismo de borrado selectivo. No es un blocker inmediato dado que el consentimiento guardian ya existe en el schema de `profiles` (migration 005), pero se debe documentar que el borrado de datos de un menor via "right to erasure" debe incluir limpiar sus claves RSVP de localStorage y, en el futuro, de Supabase.
+**Fix requerido**: Agregar a la documentacion del backlog: cuando se implemente borrado de atleta, iterar y limpiar todas las claves `elevate_rsvp_*` donde aparezca el `athleteId` del menor.
+
+---
+
+**BUG-CAL-005 — MENOR**
+**Categoria**: UX — Convocados por posicion de array, no por lista explicita
+**Archivo**: `src/components/Calendario.jsx` (linea 425)
+**Descripcion**: Para partidos oficiales, los "convocados" se determinan tomando los primeros N atletas del array: `athleteIds.slice(0, event.convocados)`. El orden del array es el orden de insercion en localStorage, no un criterio de seleccion tecnica. En produccion esto significa que el entrenador ve el RSVP de los primeros 22 atletas ordenados por cuando fueron agregados al sistema, no por quienes estan realmente convocados para ese partido.
+**Fix requerido**: En la version de produccion (no demo), el evento partido debe tener un campo `convocadoIds: string[]` con los IDs explicitos seleccionados por el coach. El slice por N es aceptable solo en modo demo.
+
+---
+
+#### CHECKS QUE PASARON
+
+**SEGURIDAD XSS**: PASS. Busqueda exhaustiva de `dangerouslySetInnerHTML`, `innerHTML`, `eval()` — ninguno encontrado. Todo el contenido dinamico se renderiza via JSX, que escapa por defecto.
+
+**MULTI-TENANCY localStorage**: PASS (parcial — ver BUG-CAL-003 para la clave auxiliar). La clave maestra `elevate_rsvp_{clubId}` esta correctamente namespaciada. Fallback a `"demo"` cuando clubId es vacio es correcto.
+
+**RBAC**: PASS. `view:calendario` esta presente en roles `admin` y `coach`. El rol `staff` no tiene acceso, correcto. La verificacion se hace en `canAccessModule()` antes de renderizar, en `navigateTo` de App.jsx. El tile en Home.jsx usa `onNavigate("calendario")` que pasa por el mismo guard.
+
+**PERFORMANCE — Bundle Calendario**: PASS. El chunk `Calendario-BsQ8P6d5.js` pesa 20.42 kB (5.76 kB gzip). Dentro del rango aceptable. La decision de no usar FullCalendar fue correcta.
+
+**PERFORMANCE — Re-renders**: PASS. `useMemo` en `events`, `grid`, y `eventsByDay`. `useCallback` en `getRsvp`, `setRsvp`, `getAvailability`, `prevMonth`, `nextMonth`, `handleSelectEvent`, `cycle`. No hay re-renders innecesarios identificados.
+
+**PERFORMANCE — Build**: PASS. Build limpio en 741ms. 0 errores, 0 warnings. Lazy import correcto desde App.jsx con ErrorBoundary y Suspense.
+
+**EDGE CASES**:
+- Atletas = 0: PASS. `convocadoIds.length === 0` muestra empty state con mensaje descriptivo.
+- Cambio de mes con evento seleccionado: PASS. `useEffect` detecta que el evento seleccionado ya no existe y cierra el panel.
+- clubId vacio string: PASS. Fallback a `"demo"` en el hook.
+- Navegacion prev/next en enero/diciembre: PASS. La logica maneja el rollover de año correctamente.
+
+**ENTRENAMIENTO — conexion navegacion**: PASS. El tile en Home.jsx usa `onNavigate("calendario")`, que pasa por `canAccessModule()` en App.jsx antes de cambiar `activeModule`.
+
+---
+
+#### VEREDICTO FINAL
+
+**CONDITIONAL GO-LIVE**
+
+Condiciones para desbloquear merge a master:
+
+1. **BUG-CAL-001** (CRITICO): Implementar la lectura del bloqueo RPE en Entrenamiento.jsx, o remover la promesa de la arquitectura y documentar que el bloqueo es trabajo futuro. No se puede shipear una feature documentada que no funciona.
+2. **BUG-CAL-003** (MAYOR): Agregar `clubId` a las claves auxiliares de ausencia para cumplir el patron de aislamiento de datos de menores exigido por Ley 1581.
+
+Los BUG-CAL-002, 004, 005 pueden resolverse en el siguiente sprint.
+
+@Arquitecto: BUG-CAL-001 requiere decision de arquitectura sobre el canal canonico de bloqueo RPE.
+@Mateo: BUG-CAL-002 requiere garantia de que los atletas siempre tienen UUID antes de llegar al Calendario.
+
+---
+
 ## 2026-03-28 — Sprint Landscape: TacticalBoard v9.1 REDISEÑO COMPLETO DEL CAMPO
 **Directiva de**: Julián — "La pizarra se ve angosta, sin libertad de movimiento, poco profesional"
 **Status**: 🟢 V9.1 LISTO PARA QA — Build limpio, 0 errores, 0 warnings

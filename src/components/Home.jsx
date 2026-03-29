@@ -101,6 +101,7 @@ const NAV_ITEMS = [
   { key:"home",          label:"Inicio",               navigable:false },
   { key:"entrenamiento", label:"Entrenamiento",         navigable:true  },
   { key:"plantilla",     label:"Gestión de plantilla",  navigable:true  },
+  { key:"calendario",    label:"Calendario",            navigable:true  },
   { key:"admin",         label:"Administración",        navigable:true  },
   { key:"reportes",      label:"Reportes",              navigable:true  },
   { key:"miclub",        label:"Mi club",               navigable:true  },
@@ -562,6 +563,57 @@ export default function Home({ club, athletes, stats, matchStats, onNavigate, mo
             </div>
           )}
         </InteractiveTile>
+
+        {/* TILE 6 — CALENDARIO (fila 3, ancho completo) */}
+        <div
+          onClick={() => onNavigate("calendario")}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = PALETTE.neon; playHover(); }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(200,255,0,0.15)"; }}
+          style={{
+            position:"relative", overflow:"hidden",
+            gridColumn:"1/4", gridRow:"3",
+            borderTop:`2px solid rgba(200,255,0,0.35)`,
+            border:`1px solid rgba(200,255,0,0.15)`,
+            background:"linear-gradient(135deg,rgba(200,255,0,0.04),rgba(10,10,18,0.96))",
+            cursor:"pointer",
+            minHeight:64,
+            display:"flex", alignItems:"center", justifyContent:"space-between",
+            padding:"0 24px",
+            transition:"border-color 200ms",
+            boxShadow:"0 4px 24px rgba(0,0,0,0.4)",
+          }}
+        >
+          {/* Icono calendario */}
+          <div style={{ display:"flex", alignItems:"center", gap:16 }}>
+            <div style={{ width:36, height:36, border:`1px solid rgba(200,255,0,0.3)`, display:"flex", alignItems:"center", justifyContent:"center", background:"rgba(200,255,0,0.06)" }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <rect x="3" y="4" width="18" height="18" rx="1" stroke={PALETTE.neon} strokeWidth="1.5"/>
+                <path d="M3 10h18M8 2v4M16 2v4" stroke={PALETTE.neon} strokeWidth="1.5" strokeLinecap="round"/>
+                <rect x="7" y="14" width="3" height="3" rx="0.5" fill={PALETTE.neon} opacity="0.7"/>
+                <rect x="10.5" y="14" width="3" height="3" rx="0.5" fill={PALETTE.neon} opacity="0.4"/>
+                <rect x="14" y="14" width="3" height="3" rx="0.5" fill={PALETTE.neon} opacity="0.2"/>
+              </svg>
+            </div>
+            <div>
+              <div style={{ fontSize:8, textTransform:"uppercase", letterSpacing:"2px", color:"rgba(200,255,0,0.6)", marginBottom:3 }}>Módulo 06</div>
+              <div style={{ fontSize:14, fontWeight:900, color:PALETTE.text, textTransform:"uppercase", letterSpacing:"-0.3px" }}>
+                Calendario & RSVP
+              </div>
+            </div>
+          </div>
+
+          {/* Descripción + CTA */}
+          <div style={{ display:"flex", alignItems:"center", gap:24 }}>
+            <div style={{ textAlign:"right" }}>
+              <div style={{ fontSize:9, color:PALETTE.textMuted, textTransform:"uppercase", letterSpacing:"0.5px" }}>
+                Partidos · Entrenamientos · Asistencia
+              </div>
+            </div>
+            <div style={{ fontSize:9, fontWeight:700, textTransform:"uppercase", letterSpacing:"1.5px", padding:"7px 16px", border:`1px solid rgba(200,255,0,0.4)`, color:PALETTE.neon }}>
+              Abrir →
+            </div>
+          </div>
+        </div>
 
       </motion.div>
 

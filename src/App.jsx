@@ -50,6 +50,7 @@ const Entrenamiento = lazy(() => import("./components/Entrenamiento"));
 const GestionPlantilla = lazy(() => import("./components/GestionPlantilla"));
 const MiClub = lazy(() => import("./components/MiClub"));
 const Administracion = lazy(() => import("./components/Administracion"));
+const Calendario     = lazy(() => import("./components/Calendario"));
 
 // ── Conectar handlers de error de storage al boot (antes de que cualquier hook escriba) ──
 const _toastError = (msg) => showToast(msg, "error");
@@ -364,7 +365,7 @@ function CRMApp() {
           {activeModule === "entrenamiento" && (
             <ErrorBoundary>
               <MiniTopbar title="Entrenamiento" />
-              <Entrenamiento athletes={athletes} setAthletes={setAthletes} historial={historial} onGuardar={guardarSesion} stats={stats} clubInfo={clubInfo} />
+              <Entrenamiento athletes={athletes} setAthletes={setAthletes} historial={historial} onGuardar={guardarSesion} stats={stats} clubInfo={clubInfo} clubId={authProfile?.club_id || ""} />
             </ErrorBoundary>
           )}
 
@@ -386,6 +387,13 @@ function CRMApp() {
             <ErrorBoundary>
               <MiniTopbar title="Administracion" accent={C.purple} accentBg="rgba(127,119,221,0.08)" />
               <Administracion athletes={athletes} finanzas={finanzas} setFinanzas={setFinanzas} />
+            </ErrorBoundary>
+          )}
+
+          {activeModule === "calendario" && (
+            <ErrorBoundary>
+              <MiniTopbar title="Calendario" accent={C.neon} accentBg="rgba(200,255,0,0.05)" />
+              <Calendario athletes={athletes} clubId={authProfile?.club_id || ""} />
             </ErrorBoundary>
           )}
 

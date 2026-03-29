@@ -1,9 +1,10 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Planificacion from "./Planificacion";
 import { getAvatarUrl as PHOTO } from "../utils/helpers";
 import { PALETTE } from "../constants/palette";
 import { sanitizeNote } from "../utils/sanitize";
 import EmptyState from "./ui/EmptyState";
+import { showToast } from "./Toast";
 
 // ── Inject responsive media queries once ────────────────────────────────────
 if (typeof document !== "undefined" && !document.getElementById("entrenamiento-responsive")) {
@@ -72,7 +73,7 @@ const TIPO_COLORS = {
   "Partido interno": PALETTE.danger,
 };
 
-export default function Entrenamiento({ athletes, setAthletes, historial, onGuardar, stats, clubInfo }) {
+export default function Entrenamiento({ athletes, setAthletes, historial, onGuardar, stats, clubInfo, clubId = "" }) {
   const [tab, setTab] = useState("sesion");
   const [tipo, setTipo] = useState("Táctica");
   const [nota, setNota] = useState("");
@@ -120,7 +121,28 @@ export default function Entrenamiento({ athletes, setAthletes, historial, onGuar
     setAthletes(u);
   };
 
+  /** Verifica si un atleta está AUSENTE en el calendario RSVP para hoy */
+  const isRsvpAbsent = useCallback((athleteId) => {
+    if (!athleteId) return false;
+    const cid = clubId || "demo";
+    const today = new Date().toISOString().slice(0, 10);
+    // Buscar cualquier clave de ausencia para hoy
+    for (let k = 0; k < localStorage.length; k++) {
+      const key = localStorage.key(k);
+      if (key?.startsWith(`elevate_rsvp_absent_${cid}_`) && key.endsWith(`_${athleteId}`) && localStorage.getItem(key) === "1") {
+        // Extraer fecha del eventId para verificar si es hoy
+        if (key.includes(today)) return true;
+      }
+    }
+    return false;
+  }, [clubId]);
+
   const setRpe = (i, val) => {
+    const a = athletes[i];
+    if (isRsvpAbsent(a?.id)) {
+      showToast("Jugador marcado AUSENTE en el calendario — RPE bloqueado", "warning");
+      return;
+    }
     const u = [...athletes];
     u[i] = { ...u[i], rpe: u[i].rpe === val ? null : val };
     setAthletes(u);

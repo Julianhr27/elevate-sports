@@ -18,7 +18,7 @@ export const ROLES = {
     description: "Acceso total al club",
     permissions: [
       "view:home", "view:entrenamiento", "view:plantilla", "view:admin",
-      "view:miclub", "view:reportes",
+      "view:miclub", "view:reportes", "view:calendario",
       "edit:athletes", "edit:sesion", "edit:finanzas", "edit:clubInfo",
       "edit:tactical", "export:backup", "manage:roles",
     ],
@@ -27,7 +27,7 @@ export const ROLES = {
     label: "Entrenador",
     description: "Entrenamiento, plantilla y tactica",
     permissions: [
-      "view:home", "view:entrenamiento", "view:plantilla", "view:reportes",
+      "view:home", "view:entrenamiento", "view:plantilla", "view:reportes", "view:calendario",
       "edit:athletes", "edit:sesion", "edit:tactical",
     ],
   },
