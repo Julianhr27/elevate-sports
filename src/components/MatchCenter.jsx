@@ -24,7 +24,6 @@ import {
   getAthleteScoreHistory,
   DEMO_MATCH_REPORTS,
 } from "../utils/elevateScore";
-import { calcSaludActual } from "../utils/rpeEngine";
 
 // ── Inyectar responsive CSS una sola vez ──────────────────────────────────────
 if (typeof document !== "undefined" && !document.getElementById("mc-responsive")) {
@@ -414,7 +413,7 @@ function FatigaIndicator({ rpe }) {
 /** Player Card Pro — estética Ultimate Team Charcoal/Neon */
 function PlayerCardPro({ athlete, stats, elevateScore, rpe, historial, onSelect, selected }) {
   const ovr     = calcOVR(getAthleteScoreHistory(athlete.id));
-  const alert   = getPerformanceAlert(rpe ?? 5, elevateScore);
+  const alert   = rpe != null ? getPerformanceAlert(rpe, elevateScore) : null;
   const scoreColor = elevateScore >= 7 ? C.neon : elevateScore >= 4 ? C.amber : C.danger;
 
   return (
